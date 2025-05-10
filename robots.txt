@@ -1,0 +1,6 @@
+# robots.txt for https://sednabcn.github.io/
+User-agent: *
+Allow: /
+
+# Main sitemap index
+Sitemap: https://sednabcn.github.io/sitemap.xml
