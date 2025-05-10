@@ -1,4 +1,4 @@
-# Sedna BCN GitHub Pages[
+# Sedna BCN GitHub Pages
 # sednabcn.github.io
  "My main GitHub Pages site"
 
