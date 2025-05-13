@@ -1,0 +1,42 @@
+name: Cleanup Failed Workflow Runs
+
+on:
+  workflow_dispatch:  # Manual trigger
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday at midnight
+
+permissions:
+  actions: write   # Required to delete workflow runs
+  contents: read   # Read repository contents
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup GitHub CLI
+        uses: cli/cli-action@v1
+      
+      - name: Authenticate with GitHub
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+      
+      - name: Cleanup Failed Workflow Runs
+        run: |
+          # Get repository name from the environment
+          REPO="${GITHUB_REPOSITORY}"
+          
+          echo "Cleaning up failed workflow runs for $REPO..."
+          
+          # List all workflow runs with status 'failure' and delete them
+          gh api \
+            repos/$REPO/actions/runs?status=failure \
+            --jq '.workflow_runs[] | .id' \
+            | while read RUN_ID; do
+                echo "Deleting failed run with ID: $RUN_ID"
+                gh api --method DELETE repos/$REPO/actions/runs/$RUN_ID
+              done
+          
+          echo "Cleanup complete!"
