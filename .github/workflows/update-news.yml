@@ -25,11 +25,11 @@ jobs:
         env:
           THENEWSAPI_KEY: ${{ secrets.THENEWSAPI_KEY }}
         run: |
-          node <<EOF
+          node <<'EOF'
           const fs = require('fs');
           const axios = require('axios');
           async function fetchNews() {
-              const url = \`https://api.thenewsapi.com/v1/news/all?api_token=${process.env.THENEWSAPI_KEY}&categories=technology,science&search=AI,ML,LLM&language=en\`;
+              const url = `https://api.thenewsapi.com/v1/news/all?api_token=${process.env.THENEWSAPI_KEY}&categories=technology,science&search=AI,ML,LLM&language=en`;
               const response = await axios.get(url);
               const articles = response.data.data;
               const title = articles?.[0]?.title || 'No relevant AI news available.';
