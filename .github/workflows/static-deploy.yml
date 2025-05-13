@@ -41,9 +41,8 @@ jobs:
           # Create directories if they don't exist
           mkdir -p .github/scripts
           
-          # Create the sitemap generator script
-          cat > .github/scripts/generate_sitemaps.py << 'EOF'
-#!/usr/bin/env python3
+          # Write Python script to a file
+          echo '#!/usr/bin/env python3
 """
 This script generates sitemaps for the main GitHub Pages site and updates references to project sitemaps.
 """
@@ -56,24 +55,29 @@ import lxml.etree as ET
 def generate_sitemap(url):
     # Request the page
     response = requests.get(url)
-    soup = BeautifulSoup(response.text, 'html.parser')
+    soup = BeautifulSoup(response.text, "html.parser")
     
     # Generate the sitemap from links (just a basic example)
     urls = [url]
-    for link in soup.find_all('a', href=True):
-        urls.append(link['href'])
+    for link in soup.find_all("a", href=True):
+        urls.append(link["href"])
     
     # Create a simple XML sitemap
-    root = ET.Element('urlset', xmlns="http://www.sitemaps.org/schemas/sitemap/0.9")
+    root = ET.Element("urlset", xmlns="http://www.sitemaps.org/schemas/sitemap/0.9")
     for url in urls:
-        url_element = ET.SubElement(root, 'url')
-        loc = ET.SubElement(url_element, 'loc')
+        url_element = ET.SubElement(root, "url")
+        loc = ET.SubElement(url_element, "loc")
         loc.text = url
     
     tree = ET.ElementTree(root)
-    with open('sitemap.xml', 'wb') as file:
+    with open("sitemap.xml", "wb") as file:
         tree.write(file)
 
 # Example call to the function
-generate_sitemap("https://sednabcn.github.io")
-EOF
+generate_sitemap("https://sednabcn.github.io")' > .github/scripts/generate_sitemaps.py
+          
+          # Make script executable
+          chmod +x .github/scripts/generate_sitemaps.py
+          
+          # Run the script
+          python .github/scripts/generate_sitemaps.py
