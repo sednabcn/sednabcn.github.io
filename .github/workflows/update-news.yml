@@ -1,0 +1,52 @@
+name: Update News
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Every hour
+  workflow_dispatch:     # Allow manual run too
+
+jobs:
+  update-news:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install axios
+        run: npm install axios
+
+      - name: Fetch AI News and Update File
+        env:
+          THENEWSAPI_KEY: ${{ secrets.THENEWSAPI_KEY }}
+        run: |
+          node <<EOF
+          const fs = require('fs');
+          const axios = require('axios');
+
+          async function fetchNews() {
+              const url = \`https://api.thenewsapi.com/v1/news/all?api_token=${process.env.THENEWSAPI_KEY}&categories=technology,science&search=AI,ML,LLM&language=en\`;
+              const response = await axios.get(url);
+              const articles = response.data.data;
+              const title = articles?.[0]?.title || 'No relevant AI news available.';
+              fs.writeFileSync('news.json', JSON.stringify({ title }, null, 2));
+          }
+
+          fetchNews().catch(err => {
+              console.error('Failed to fetch news:', err);
+              fs.writeFileSync('news.json', JSON.stringify({ title: "Failed to fetch news" }, null, 2));
+          });
+EOF
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add news.json
+          git commit -m "Update news headline" || echo "No changes to commit"
+          git push

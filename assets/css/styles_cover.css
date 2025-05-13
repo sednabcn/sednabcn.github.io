@@ -1,0 +1,275 @@
+/* Body and General Layout */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #fff; /* Light background to contrast with navbar */
+    box-sizing: border-box;
+}
+
+/* Navbar Styling */
+nav.top-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #fff; /* White background for the navbar */
+    padding: 10px 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+    position: relative;
+}
+
+.logo img {
+    height: 40px; /* Adjust the height of the logo as needed */
+}
+
+.center-text {
+    font-size: 36px; /* Large font size for SiMLeng */
+    color: #007bff; /* Blue color for the text */
+    font-weight: bold;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    text-shadow: none;
+}
+
+/* Help Button */
+.cta {
+    background-color: #28a745; /* Green */
+    color: #ffffff; /* White text */
+    border: none;
+    border-radius: 5px;
+    padding: 8px 16px;
+    text-decoration: none;
+    font-weight: bold;
+    margin-left: 20px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.cta:hover {
+    background-color: #218838; /* Darker Green on Hover */
+}
+/* Login/Register Button */
+.login-button {
+    padding: 10px 20px;
+    background-color: #007bff; /* Primary Blue */
+    color: white;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+    font-size: 16px;
+}
+
+.login-button:hover {
+    background-color: #0056b3; /* Darker Blue on Hover */
+}
+
+
+/* Modal */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 20px;
+    border-radius: 10px;
+    width: 300px;
+    position: relative;
+    animation: modalOpen 0.3s ease-out;
+}
+
+@keyframes modalOpen {
+    from { transform: translateY(-50px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.tabs {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 20px;
+}
+
+.tab {
+    cursor: pointer;
+    padding: 10px 20px;
+    background-color: #e0e0e0;
+    border-radius: 5px;
+    text-align: center;
+}
+
+.tab.active {
+    background-color: #007bff;
+    color: white;
+}
+
+.form-content {
+    display: none;
+}
+
+.form-content.active {
+    display: block;
+}
+
+.form-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+input[type="text"], input[type="email"], input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+}
+
+button[type="submit"] {
+    width: 100%;
+    padding: 10px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.recover-password, .back-to-login {
+    text-align: center;
+    cursor: pointer;
+    margin-top: 10px;
+    color: #007bff;
+    font-size: 14px;
+}
+ 
+
+/* End of Modal/form for Login/Register */
+/* Blank Strip */
+.blank-strip {
+    height: 1cm;
+    background-color: #fff; /* White strip */
+}
+
+/* Header */
+.header {
+    font-size: 2rem; /* Large text size for prominence */
+    text-align: center;
+    color: #ffffff; /* Ensure text is visible on the background */
+    background-color: #00509e; /* Slightly more opaque background for contrast */
+    padding: 60px 20px; /* Add more padding for better readability */
+    border-radius: 5px; /* Round the corners */
+    width: 100%;
+    display: block; /* inline-block; /* Ensure proper centering */
+    font-weight: bold; /* Make the text bold */
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3); /* Subtle shadow for added depth */
+    margin: 0 auto; /* Center the header horizontally */
+    box-sizing: border-box; /* Ensure padding and borders are included in the total width and height */
+}
+
+.header-container {
+    width: 100%; /* Ensure the container takes full width */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 0; /* Optional: Add padding around the container */
+    box-sizing: border-box; /* Ensure padding is included in the width/height */
+}
+
+/* Paragraph styling */
+.header p {
+  color: #ffffff; /* White as default text color */
+  font-size: 1.25rem;
+  margin-top: 0;
+}
+
+/* Yellow highlight for emphasis */
+.header .yellow-bold {
+  color: #FFD700; /* Gold/yellow that pops against blue */
+  font-weight: bold;
+  font-weight: 700;
+  padding: 2px 6px; /* Adds a bit of spacing inside the highlight */
+  border-radius: 4px; /* Optional: soft rounded corners */
+}
+
+.advertising-news {
+    background-color: #f4f4f4;
+    padding: 5px;
+    text-align: center;
+    border-top: 1px solid #ddd;
+    border-bottom: 1px solid #ddd;
+}
+
+.advertising-news h4 {
+    color: blue; /* Set the text color for h4 */
+    margin-bottom: 10px; /* Optional: Add some spacing below the h4 */
+}
+
+#flushingText {
+    position: relative; /* Required for positioning the link */
+    font-size: 16px; /* Adjust text size */
+    color: blue; /* Set the text color for p */
+    margin: 0 auto; /* Center align the text block if it has a specific width */
+    display: inline-block; /* Inline block to adjust the width of the p element */
+    background-color: yellow; /* Highlight the p text with a yellow background */
+    padding: 5px; /* Optional: Add some padding inside the p element */
+    border-radius: 3px; /* Optional: Add rounded corners to the highlighted text */
+}
+
+#stopLink {
+    color: blue; /* Blue color for the link */
+    text-decoration: underline; /* Underline to indicate it's a link */
+    display: none; /* Initially hide the link */
+}
+
+/* Styles for the link when it's visible */
+#flushingText.show-link #stopLink {
+    display: inline; /* Show the link */
+}
+
+/* Main Content Wrapper */
+.content-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+/* Image Container */
+.image-container {
+    position: relative; /* Allows absolute positioning of child elements */
+    background-image: url('/assets/images/ai-llm-blog.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    height: 1200px; /* Adjust height as needed */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white; /* Text color */
+    width: 100%; /* Ensures the hero image covers the full width */
+}
+
+
+.yellow-bold {
+    color: #FFD700; /* Bright yellow (Gold) */
+    font-weight: bold;
+    font-size: 2em; /* Optional: makes the title larger */
+}

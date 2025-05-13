@@ -201,6 +201,29 @@ EOF
           # Run the script
           python .github/scripts/generate_sitemaps.py
 
+      # Check if there are any sitemap changes
+      - name: Check for changes
+        id: git-check
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add sitemap.xml sitemap-main.xml robots.txt
+          if git diff --staged --exit-code; then
+            echo "No changes to commit"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Changes need to be committed"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      # Commit sitemap changes if any
+      - name: Commit changes
+        if: steps.git-check.outputs.has_changes == 'true'
+        run: |
+          git commit -m "Update sitemaps and robots.txt"
+          git push
+
+      # Upload the site for GitHub Pages deployment
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v2
         with:

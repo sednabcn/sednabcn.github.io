@@ -1,0 +1,329 @@
+/* footer.css */
+footer {
+    background-color: #f9f9f9;
+    padding: 40px 0 20px;
+    color: #333;
+    font-family: Arial, sans-serif;
+    margin-top: 5px;
+}
+.footer-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 40px; /* Equal gap between items */
+    padding: 0 20px;
+}
+
+.footer-section {
+    flex: 1;
+    min-width: 250px;
+    margin-bottom: 30px;
+}
+
+.footer-section,
+.map {
+    flex: 1 1 250px; /* Grow and shrink as needed, min width 250px */
+    margin-bottom: 30px;
+}
+
+/* Section titles without underlines */
+.section-title {
+    color: #0066cc;
+    font-size: 18px;
+    margin-bottom: 20px;
+    font-weight: bold;
+    /* No underlines as preferred */
+}
+.footer-left {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.author-img {
+    margin-bottom: 20px; /* Instead of auto centering */
+}
+
+/* Author section */
+.author-img {
+    width: 80px;
+    height: 75px;
+    border-radius: 50%;
+    margin-bottom: 20px;
+    display: block;
+    margin: 0 auto 20px auto;
+}
+
+.blue-bold {
+    color: #0066cc;
+    font-weight: bold;
+}
+
+.footer-left p {
+    text-align: justify;
+    line-height: 1.6;
+}
+
+/* Projects section */
+.project-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+.project-list li {
+    margin-bottom: 10px;
+    line-height: 1.5;
+}
+
+.project-list a {
+    color: #0066cc;
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.project-list a:hover {
+    color: #004999;
+    text-decoration: underline;
+}
+
+.limited-width {
+    display: inline-block;
+    max-width: 95%;
+}
+
+/* Contact section */
+.contact-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.contact-section, .social-section {
+    margin-bottom: 25px;
+}
+
+.contact-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+.contact-list li {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 15px;
+}
+
+.contact-list i {
+    color: #0066cc;
+    margin-right: 10px;
+    min-width: 16px;
+    margin-top: 4px;
+}
+
+.contact-list a {
+    color: #0066cc;
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.contact-list a:hover {
+    color: #004999;
+    text-decoration: underline;
+}
+/* Follow Us section - Improved Social Icons */
+.follow-us-heading {
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.social-media {
+    display: flex;
+    gap: 12px;
+    flex-wrap: nowrap;
+    align-items: center;
+}
+
+.social-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    flex-shrink: 0;
+}
+
+.social-icon:before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+    z-index: 1;
+}
+
+.social-icon i {
+    position: relative;
+    z-index: 2;
+    font-size: 16px;
+}
+
+.social-icon:hover {
+    transform: translateY(-3px);
+}
+
+.social-icon:hover:before {
+    transform: translateY(0);
+}
+
+/* Social media icon improved colors and gradients */
+.whatsapp { 
+    background: linear-gradient(45deg, #128C7E, #25D366); 
+}
+
+.facebook { 
+    background: linear-gradient(45deg, #0D69EC, #1877F2); 
+}
+
+.twitter { 
+    background: linear-gradient(45deg, #0C85CF, #1DA1F2); 
+}
+
+.linkedin { 
+    background: linear-gradient(45deg, #0A4D99, #0A66C2); 
+}
+
+.instagram { 
+    background: linear-gradient(45deg, #833AB4, #FD1D1D, #FCAF45);
+}
+
+.youtube { 
+    background: linear-gradient(45deg, #C4302B, #FF0000); 
+}
+
+.github { 
+    background: linear-gradient(45deg, #0D1117, #171515); 
+}
+
+/* Mobile responsiveness for social icons */
+@media (max-width: 576px) {
+    .social-media {
+        gap: 10px;
+    }
+    
+    .social-icon {
+        width: 30px;
+        height: 30px;
+    }
+}
+
+/* Map section */
+.map {
+    flex: 1;
+    min-width: 250px;
+    margin-bottom: 30px;
+}
+
+.map iframe {
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.reference {
+    position: absolute;
+    top: 20px; /* Moves the element down by 20px */
+    left: 20px; /* Moves the element right by 20px */
+    background-color: rgba(255, 255, 255, 0.8); /* Light background for readability */
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.closeBtn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    cursor: pointer;
+    font-size: 24px; /* Ensure icon size */
+}
+
+.content {
+    margin-bottom: 30px; /* Ensure there's space above the footer */
+}
+
+/* Footer bottom */
+.footer-bottom {
+    width: 100%;
+    text-align: center;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #ddd;
+}
+
+/* Responsive adjustments */
+@media (max-width: 992px) {
+    .footer-container {
+        flex-direction: column;
+    }
+    
+    .footer-section, .map {
+        width: 100%;
+        margin-right: 0;
+    }
+}
+
+* Responsive Adjustments */
+@media (max-width: 768px) {
+    .footer-container {
+        flex-direction: column;
+    }
+    
+    .footer-section {
+        width: 100%;
+        margin-right: 0;
+        margin-bottom: 30px;
+    }
+    
+    .map {
+        margin-left: 0;
+        max-width: 100%;
+    }
+     .social-media {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+    }
+}
+/* Responsive adjustments */
+@media (max-width: 500px) {
+    .social-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
+    }
+    
+    .social-media {
+        gap: 10px;
+    }
+}
+/* Media query for smaller screens */
+@media (max-width: 768px) {
+    .follow-us {
+        margin-bottom: 0.75rem;
+    }
+    
+    .follow-us:after {
+        height: 2px;
+    }
+}

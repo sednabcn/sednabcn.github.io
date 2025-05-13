@@ -3,85 +3,134 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sedna BCN - Project Portfolio</title>
-    <link rel="stylesheet" href="assets/css/style.css">
-    <meta name="description" content="A collection of projects and research by Sedna BCN, featuring AI, LLMs, and more.">
+    <title>SiMLeng Portfolio</title>
+    <link rel="stylesheet" href="./assets/css/styles_cover.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"> <!-- Font Awesome -->
+    <link rel="icon" href="./assets/images/favicon-16x16.png" type="image/x-icon">
+     <meta name="description" content="A collection of projects and research by Sedna BCN, featuring AI, LLMs, and more.">
 </head>
 <body>
-    <header>
-        <div class="container">
-            <h1>Sedna BCN</h1>
-            <p class="tagline">Research & Projects Portfolio</p>
-            <nav>
-                <ul>
-                    <li><a href="#projects">Projects</a></li>
-                    <li><a href="#about">About</a></li>
-                    <li><a href="#contact">Contact</a></li>
-                </ul>
-            </nav>
+    <nav class="top-nav">
+        <div class="logo">
+            <img src="./assets/images/simleng-card.png" alt="Logo">
         </div>
-    </header>
-
-    <main>
-        <section id="hero" class="container">
-            <h2>Welcome to My GitHub Projects Hub</h2>
-            <p>Exploring AI, language models, and beyond.</p>
-        </section>
-
-        <section id="projects" class="container">
-            <h2>Featured Projects</h2>
-            
-            <div class="project-card">
-                <h3>AI & LLM Blog</h3>
-                <p>Explorations in AI and Large Language Models - tutorials, research, and applications.</p>
-                <div class="project-links">
-                    <a href="https://sednabcn.github.io/ai-llm-blog/" class="button">Visit Site</a>
-                    <a href="https://github.com/sednabcn/ai-llm-blog" class="button secondary">View Source</a>
-                </div>
-            </div>
-            
-            <!-- Add more project cards as needed -->
-            <div class="project-card">
-                <h3>Project Two</h3>
-                <p>Brief description of your second project goes here.</p>
-                <div class="project-links">
-                    <a href="#" class="button">Visit Site</a>
-                    <a href="#" class="button secondary">View Source</a>
-                </div>
-            </div>
-            
-            <div class="project-card">
-                <h3>Project Three</h3>
-                <p>Brief description of your third project goes here.</p>
-                <div class="project-links">
-                    <a href="#" class="button">Visit Site</a>
-                    <a href="#" class="button secondary">View Source</a>
-                </div>
-            </div>
-        </section>
-
-        <section id="about" class="container">
-            <h2>About</h2>
-            <p>Brief introduction about yourself, your research interests, and technical background.</p>
-            <p>This hub connects all my GitHub Pages projects in one place for easier navigation and discovery.</p>
-        </section>
-
-        <section id="contact" class="container">
-            <h2>Contact</h2>
-            <p>You can reach me at: <a href="mailto:your.email@example.com">your.email@example.com</a></p>
-            <div class="social-links">
-                <a href="https://github.com/sednabcn" target="_blank">GitHub</a>
-                <!-- Add other social links as needed -->
-            </div>
-        </section>
-    </main>
-
-    <footer>
-        <div class="container">
-            <p>&copy; 2025 Sedna BCN. All rights reserved.</p>
+        <div class="center-text">
+            SiMLeng
         </div>
-    </footer>
+        <div class="menu">
+	  <a href="https://sednabcn.github.io/ai-llm-blog" class="cta" target="_blank">Blog</a>
+	  <!-- Trigger Button -->
+	  <button class="login-button" onclick="openModal()">Login/Register</button>
 
-    <script src="assets/js/main.js"></script>
+        </div>
+    </nav>
+    <!-- Login Modal (Global) -->
+    
+<!-- Modal -->
+<div id="authModal" class="modal-overlay">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        
+        <!-- Tab Headers -->
+        <div class="tabs">
+            <div class="tab active" onclick="openTab(event, 'login')">Login</div>
+            <div class="tab" onclick="openTab(event, 'register')">Register</div>
+        </div>
+        
+        <!-- Login Form -->
+        <div id="login" class="form-content active">
+            <h2 class="form-header">Login</h2>
+            <form id="loginForm">
+                <label for="loginEmail">Email</label>
+                <input type="email" id="loginEmail" placeholder="Enter your email" required>
+                
+                <label for="loginPassword">Password</label>
+                <input type="password" id="loginPassword" placeholder="Enter your password" required>
+                
+                <button type="submit">Login</button>
+                
+                <p class="recover-password" onclick="openTab(event, 'recover')">Forgot Password?</p>
+            </form>
+        </div>
+        
+        <!-- Register Form -->
+        <div id="register" class="form-content">
+            <h2 class="form-header">Register</h2>
+            <form id="registerForm">
+                <label for="registerName">Name</label>
+                <input type="text" id="registerName" placeholder="Enter your name" required>
+                
+                <label for="registerEmail">Email</label>
+                <input type="email" id="registerEmail" placeholder="Enter your email" required>
+                
+                <label for="registerPassword">Password</label>
+                <input type="password" id="registerPassword" placeholder="Create a password" required>
+                
+                <button type="submit">Register</button>
+            </form>
+        </div>
+        
+        <!-- Recover Password Form -->
+        <div id="recover" class="form-content">
+            <h2 class="form-header">Recover Password</h2>
+            <form id="recoverForm">
+                <label for="recoverEmail">Email</label>
+                <input type="email" id="recoverEmail" placeholder="Enter your email" required>
+                
+                <button type="submit">Recover Password</button>
+                
+                <p class="back-to-login" onclick="openTab(event, 'login')">Back to Login</p>
+            </form>
+        </div>
+    </div>
+</div>
+
+    
+    <!-- Header (Global) -->
+    <div class="header">
+      <h4>Welcome to My GitHub Projects Hub</h4>
+      <p><span class="yellow-bold">Exploring AI, large language models, and beyond</span>.</p>
+    </div>
+    
+    <div class="advertising-news">
+      <h4>Latest in AI and Large Language Models</h4>
+      <p id="flushingText">
+	Stay updated with the newest trends in AI & LLM!
+	<a id="stopLink" href="#">Stop Flushing</a>
+      </p>
+      
+    </div>
+    
+    <!--Header End -->
+        <!-- Main Content Wrapper -->
+    <div class="content-wrapper">
+        <!-- Image Section with Service Matrix -->
+        <div class="image-container">
+	    <!--<div class="hero-header">
+               Welcome to SiMLeng
+            </div>-->
+       
+	    <img src="./assets/images/ai-llm-blog.png" alt="Background Image" class="background-image">
+
+          </div>
+	</div>
+
+        <!-- Footer Section -->
+        <footer>
+          <div id="footer"></div>
+	  <script>
+            async function loadFooter() {
+              try {
+                const response = await fetch('footer_cover.html');
+                const data = await response.text();
+                document.getElementById("footer").innerHTML = data;
+              } catch (error) {
+                console.error('Error loading footer:', error);
+              }
+            } 
+            loadFooter();
+          </script>
+        </footer>
+        <script src="./assets/js/scripts_cover.js"></script> <!-- Your JavaScript file -->
 </body>
 </html>

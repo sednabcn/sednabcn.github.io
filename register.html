@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Math Tutor SiMLeng</title>
+    <link rel="stylesheet" href="register.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"> <!-- Font Awesome -->
+    <link rel="icon" href="images/favicon-16x16.png" type="image/x-icon">
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="top-nav">
+        <div class="logo">
+            <img src="images/logo.png" alt="SiMLeng Logo">
+        </div>
+        <div class="center-text">
+            SiMLeng Registration
+        </div>
+        <div class="menu">
+            <a href="help.html" class="cta">Help</a>
+            <div class="login-avatar">
+                <img src="images/avatar.png" alt="User Avatar" id="avatar">
+                <div id="loginmenu" class="login-menu">
+                    <ul>
+                        <li><a href="#">Profile</a></li>
+                        <li><a href="#">Settings</a></li>
+                        <li><a href="#">Feedback</a></li>
+                        <li><a href="#" id="logoutButton">Logout</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header -->
+    <div class="header">
+        <h4>Register for Tutoring Services</h4>
+        <img src="images/teacher.png" alt="Math Tutor Image" class="teacher-img">
+    </div>
+
+    <!-- Main Content -->
+    <div class="content-wrapper">
+        <!--Hidden Registration Form -->
+        <!--<div class="panel center-panel"> -->
+	<div id="registration-form" style="display: none;">  
+            <h2>Student Registration Form</h2>
+            <form id="register-form">
+                <div class="section">
+                    <h3>Personal Details</h3>
+                    <label for="fullName">Full Name:</label>
+                    <input type="text" id="fullName" name="fullName" required>
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" name="email" required>
+                    <label for="phone">Phone:</label>
+                    <input type="tel" id="phone" name="phone" required>
+                </div>
+
+                <div class="section">
+                    <h3>Subject Details</h3>
+                    <label for="subject">Subject:</label>
+                    <input type="text" id="subject" name="subject" required>
+                    <label for="course">Course:</label>
+                    <input type="text" id="course" name="course" required>
+                    <label for="grade">Grade:</label>
+                    <input type="text" id="grade" name="grade" required>
+                </div>
+
+                <div class="section">
+                    <h3>Frequency</h3>
+                    <label for="lessons"># of Lessons/Week:</label>
+                    <input type="number" id="lessons" name="lessons" required>
+                    <label for="hours"># of Hours/Lesson:</label>
+                    <input type="number" id="hours" name="hours" required>
+                </div>
+
+                <div class="section">
+                    <h3>Modality</h3>
+                    <label><input type="radio" name="modality" value="online"> Online</label>
+                    <label><input type="radio" name="modality" value="presencial"> Presencial</label>
+                    <label><input type="radio" name="modality" value="student-home"> Presencial (Student Home)</label>
+                    <label><input type="radio" name="modality" value="combined"> Combined</label>
+                </div>
+
+                <div class="section">
+                    <h3>Contact Via</h3>
+                    <label><input type="checkbox" name="contactVia" value="email"> Email</label>
+                    <label><input type="checkbox" name="contactVia" value="sms"> SMS</label>
+                    <label><input type="checkbox" name="contactVia" value="call"> Call</label>
+                </div>
+
+                <div class="section">
+                    <h3>How did you find us?</h3>
+                    <label><input type="checkbox" name="foundUs" value="google"> Google</label>
+                    <label><input type="checkbox" name="foundUs" value="socialMedia"> Social Media</label>
+                    <label><input type="checkbox" name="foundUs" value="youtube"> YouTube</label>
+                    <!-- Add more options as needed -->
+                </div>
+
+                <div class="section">
+                    <label><input type="checkbox" required> I accept the data collection policy.</label>
+                </div>
+
+                <div class="apply-button-container">
+                    <button type="submit">Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div id="footer"></div>
+        <script>
+            async function loadFooter() {
+                try {
+                    const response = await fetch('footer.html');
+                    const data = await response.text();
+                    document.getElementById("footer").innerHTML = data;
+                } catch (error) {
+                    console.error('Error loading footer:', error);
+                }
+            }
+            loadFooter();
+        </script>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="scripts.js"></script>
+</body>
+</html>
