@@ -1,27 +1,22 @@
 name: Deploy Static Site and Generate Sitemaps
 
-# Triggers when code is pushed to main branch or manually triggered
 on:
   push:
     branches: ["master"]
   workflow_dispatch:
   schedule:
-    # Run weekly on Sunday at midnight to update sitemaps
     - cron: '0 0 * * 0'
 
-# Set required permissions
 permissions:
   contents: write
   pages: write
   id-token: write
 
-# Allow only one deployment at a time
 concurrency:
   group: "pages"
   cancel-in-progress: true
 
 jobs:
-  # Build and deploy the static site
   deploy:
     runs-on: ubuntu-latest
     steps:
@@ -33,51 +28,47 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
-      - name: Generate Sitemaps
+      - name: Install Python Dependencies
+        run: pip install requests beautifulsoup4 lxml
+
+      - name: Create Python Script Directory
+        run: mkdir -p .github/scripts
+
+      - name: Create Sitemap Generator Script
         run: |
-          # Install Python dependencies
-          pip install requests beautifulsoup4 lxml
+          cat > .github/scripts/generate_sitemaps.py << 'EOFMARKER'
+          #!/usr/bin/env python3
+          """
+          This script generates sitemaps for the main GitHub Pages site.
+          """
+          import os
+          import requests
+          from bs4 import BeautifulSoup
+          import lxml.etree as ET
           
-          # Create directories if they don't exist
-          mkdir -p .github/scripts
+          def generate_sitemap(url):
+              response = requests.get(url)
+              soup = BeautifulSoup(response.text, "html.parser")
+              
+              urls = [url]
+              for link in soup.find_all("a", href=True):
+                  urls.append(link["href"])
+              
+              root = ET.Element("urlset", xmlns="http://www.sitemaps.org/schemas/sitemap/0.9")
+              for url in urls:
+                  url_element = ET.SubElement(root, "url")
+                  loc = ET.SubElement(url_element, "loc")
+                  loc.text = url
+              
+              tree = ET.ElementTree(root)
+              with open("sitemap.xml", "wb") as file:
+                  tree.write(file)
           
-          # Write Python script to a file
-          echo '#!/usr/bin/env python3
-"""
-This script generates sitemaps for the main GitHub Pages site and updates references to project sitemaps.
-"""
-import os
-import requests
-from bs4 import BeautifulSoup
-import lxml.etree as ET
+          generate_sitemap("https://sednabcn.github.io")
+          EOFMARKER
 
-# Example sitemap generation
-def generate_sitemap(url):
-    # Request the page
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, "html.parser")
-    
-    # Generate the sitemap from links (just a basic example)
-    urls = [url]
-    for link in soup.find_all("a", href=True):
-        urls.append(link["href"])
-    
-    # Create a simple XML sitemap
-    root = ET.Element("urlset", xmlns="http://www.sitemaps.org/schemas/sitemap/0.9")
-    for url in urls:
-        url_element = ET.SubElement(root, "url")
-        loc = ET.SubElement(url_element, "loc")
-        loc.text = url
-    
-    tree = ET.ElementTree(root)
-    with open("sitemap.xml", "wb") as file:
-        tree.write(file)
+      - name: Make Script Executable
+        run: chmod +x .github/scripts/generate_sitemaps.py
 
-# Example call to the function
-generate_sitemap("https://sednabcn.github.io")' > .github/scripts/generate_sitemaps.py
-          
-          # Make script executable
-          chmod +x .github/scripts/generate_sitemaps.py
-          
-          # Run the script
-          python .github/scripts/generate_sitemaps.py
+      - name: Run Sitemap Generator
+        run: python .github/scripts/generate_sitemaps.py
