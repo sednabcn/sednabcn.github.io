@@ -42,7 +42,7 @@ jobs:
           mkdir -p .github/scripts
           
           # Create the sitemap generator script
-          cat > .github/scripts/generate_sitemaps.py <<EOF
+          cat > .github/scripts/generate_sitemaps.py << 'EOF'
 #!/usr/bin/env python3
 """
 This script generates sitemaps for the main GitHub Pages site and updates references to project sitemaps.
