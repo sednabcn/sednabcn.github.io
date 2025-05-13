@@ -28,7 +28,6 @@ jobs:
           node <<EOF
           const fs = require('fs');
           const axios = require('axios');
-
           async function fetchNews() {
               const url = \`https://api.thenewsapi.com/v1/news/all?api_token=${process.env.THENEWSAPI_KEY}&categories=technology,science&search=AI,ML,LLM&language=en\`;
               const response = await axios.get(url);
@@ -36,7 +35,6 @@ jobs:
               const title = articles?.[0]?.title || 'No relevant AI news available.';
               fs.writeFileSync('news.json', JSON.stringify({ title }, null, 2));
           }
-
           fetchNews().catch(err => {
               console.error('Failed to fetch news:', err);
               fs.writeFileSync('news.json', JSON.stringify({ title: "Failed to fetch news" }, null, 2));
