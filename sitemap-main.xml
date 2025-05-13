@@ -1,89 +1,45 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" ?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <!-- Main site homepage -->
   <url>
     <loc>https://sednabcn.github.io/</loc>
-    <lastmod>2025-05-10</lastmod>
+    <lastmod>2025-05-13</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
-  
-  <!-- AI LLM Blog main page -->
   <url>
     <loc>https://sednabcn.github.io/ai-llm-blog/</loc>
-    <lastmod>2025-05-10</lastmod>
+    <lastmod>2025-05-13</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
-   <!-- Static About page -->
-  <url>
-    <loc>https://sednabcn.github.io/ai-llm-blog/about/</loc>
-    <lastmod>2025-05-01T00:00:00+00:00</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-
-  <!-- Key pages from ai-llm-blog based on directory structure -->
-  
-  <url>
-    <loc>https://sednabcn.github.io/ai-llm-blog/pages/</loc>
-    <lastmod>2025-05-10</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <!-- ai-llm-blog Posts Overview (not individual posts) -->
   <url>
     <loc>https://sednabcn.github.io/ai-llm-blog/posts/</loc>
-    <lastmod>2025-05-10</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <!-- Tutorials Overview (not individual tutorial pages) -->
-  <url>
-    <loc>https://sednabcn.github.io/ai-llm-blog/tutorials/</loc>
-    <lastmod>2025-05-10</lastmod>
+    <lastmod>2025-05-13</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
-  <!-- Resources or Learning Center for AI & LLMs -->
   <url>
-    <loc>https://sednabcn.github.io/ai-llm-blog/resources/</loc>
-    <lastmod>2025-05-10</lastmod>
+    <loc>https://sednabcn.github.io/ai-llm-blog/about/</loc>
+    <lastmod>2025-05-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
-  
-  <!-- Community Overview (or a forum or social page) -->
-  <url>
-    <loc>https://sednabcn.github.io/ai-llm-blog/community/forum/</loc>
-    <lastmod>2025-04-15T00:00:00+00:00</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
-  <!-- Help Section Overview (General Help and Resources) -->
-  <url>
-    <loc>https://sednabcn.github.io/ai-llm-blog/help/</loc>
-    <lastmod>2025-05-01T00:00:00+00:00</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-
-  <!-- Categories Overview (not individual category pages) -->
   <url>
     <loc>https://sednabcn.github.io/ai-llm-blog/categories/</loc>
-    <lastmod>2025-05-01T00:00:00+00:00</lastmod>
+    <lastmod>2025-05-13</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.7</priority>
   </url>
-
-  <!-- Tags Overview (not individual tags) -->
   <url>
     <loc>https://sednabcn.github.io/ai-llm-blog/tags/</loc>
-    <lastmod>2025-05-01T00:00:00+00:00</lastmod>
+    <lastmod>2025-05-13</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.7</priority>
   </url>
-
-  <!-- Add any other top-level pages from your main site -->
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog</loc>
+    <lastmod>2025-05-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
 </urlset>
