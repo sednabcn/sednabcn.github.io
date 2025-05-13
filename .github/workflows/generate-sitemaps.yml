@@ -1,23 +1,53 @@
 name: Generate Sitemaps
-run: |
-  # Install Python dependencies
-  pip install requests beautifulsoup4 lxml
 
-  # Create directories if they don't exist
-  mkdir -p .github/scripts
+on:
+  # Define when this workflow should run
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  # Optional: Add scheduled runs
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sundays at midnight UTC
 
-  # Write the Python script using heredoc
-  cat << 'EOL' > .github/scripts/generate_sitemaps.py
-  #!/usr/bin/env python3
-  """
-  This script generates sitemaps for the main GitHub Pages site and updates references to project sitemaps.
-  """
-  import os
-  import requests
-  from bs4 import BeautifulSoup
-  import lxml.etree as ET
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+          
+      - name: Generate Sitemaps
+        run: |
+          # Install Python dependencies
+          pip install requests beautifulsoup4 lxml
 
-  # Example sitemap generation
-  def generate_sitemap(url):
-      print(f"Generating sitemap for {url}")
-  EOL
+          # Create directories if they don't exist
+          mkdir -p .github/scripts
+
+          # Write the Python script using heredoc
+          cat << 'EOL' > .github/scripts/generate_sitemaps.py
+          #!/usr/bin/env python3
+          """
+          This script generates sitemaps for the main GitHub Pages site and updates references to project sitemaps.
+          """
+          import os
+          import requests
+          from bs4 import BeautifulSoup
+          import lxml.etree as ET
+
+          # Example sitemap generation
+          def generate_sitemap(url):
+              print(f"Generating sitemap for {url}")
+          EOL
+          
+          # Make the script executable
+          chmod +x .github/scripts/generate_sitemaps.py
+          
+          # Run the script
+          python .github/scripts/generate_sitemaps.py
