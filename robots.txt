@@ -14,3 +14,14 @@ Sitemap: https://sednabcn.github.io/sitemap-frequency-weekly.xml
 Sitemap: https://sednabcn.github.io/sitemap-frequency-monthly.xml
 Sitemap: https://sednabcn.github.io/sitemap-frequency-index.xml
 Sitemap: https://sednabcn.github.io/sitemap-media-images.xml
+
+# Blog sitemaps
+Sitemap: https://sednabcn.github.io/ai-llm-blog/sitemap.xml
+Sitemap: https://sednabcn.github.io/ai-llm-blog/sitemap-main.xml
+Sitemap: https://sednabcn.github.io/ai-llm-blog/sitemap-posts.xml
+Sitemap: https://sednabcn.github.io/ai-llm-blog/sitemap-tags.xml
+Sitemap: https://sednabcn.github.io/ai-llm-blog/sitemap-categories.xml
+Sitemap: https://sednabcn.github.io/ai-llm-blog/sitemap-community.xml
+Sitemap: https://sednabcn.github.io/ai-llm-blog/sitemap-help.xml
+Sitemap: https://sednabcn.github.io/ai-llm-blog/sitemap-tutorials.xml
+Sitemap: https://sednabcn.github.io/ai-llm-blog/sitemap-resources.xml
