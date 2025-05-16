@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>https://sednabcn.github.io/ai-llm-blog/sitemap-main.xml</loc>
+    <lastmod>2025-05-15</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>https://sednabcn.github.io/ai-llm-blog/sitemap-posts.xml</loc>
+    <lastmod>2025-05-14</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>https://sednabcn.github.io/ai-llm-blog/sitemap-categories.xml</loc>
+    <lastmod>2025-05-13</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>https://sednabcn.github.io/ai-llm-blog/sitemap-tags.xml</loc>
+    <lastmod>2025-05-13</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>https://sednabcn.github.io/ai-llm-blog/sitemap-tutorials.xml</loc>
+    <lastmod>2025-04-15</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>https://sednabcn.github.io/ai-llm-blog/sitemap-resources.xml</loc>
+    <lastmod>2025-05-13</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>https://sednabcn.github.io/ai-llm-blog/sitemap-community.xml</loc>
+    <lastmod>2025-05-15</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>https://sednabcn.github.io/ai-llm-blog/sitemap-help.xml</loc>
+    <lastmod>2025-05-01</lastmod>
+  </sitemap>
+</sitemapindex>

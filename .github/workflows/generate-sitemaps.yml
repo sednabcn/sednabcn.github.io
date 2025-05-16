@@ -1,53 +1,76 @@
 name: Generate Sitemaps
 
 on:
-  # Define when this workflow should run
+  # Run when content is added or modified
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  # Optional: Add scheduled runs
+    branches: [ main, master ]
+    paths:
+      - 'ai-llm-blog/**/*.html'
+      - 'ai-llm-blog/**/*.md'
+      - 'assets/images/**'
+      - 'ai-llm-blog/assets/images/**'
+      - 'ai-llm-blog/posts/**'
+      - 'ai-llm-blog/tutorials/**'
+      - 'ai-llm-blog/resources/**'
+      - 'ai-llm-blog/community/**'
+      - 'ai-llm-blog/help/**'
+  
+  # Also run on a schedule to ensure sitemaps are up to date
   schedule:
-    - cron: '0 0 * * 0'  # Weekly on Sundays at midnight UTC
+    - cron: '0 0 * * 0'  # Run weekly on Sunday at midnight
+  
+  # Allow manual triggering
+  workflow_dispatch:
 
 jobs:
-  build:
+  generate-sitemap:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
-        
-      - name: Setup Python
+        with:
+          fetch-depth: 0  # Fetch all history to track changes
+      
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.x'
-          
-      - name: Generate Sitemaps
+          python-version: '3.10'
+      
+      - name: Install dependencies
         run: |
-          # Install Python dependencies
-          pip install requests beautifulsoup4 lxml
-
-          # Create directories if they don't exist
-          mkdir -p .github/scripts
-
-          # Write the Python script using heredoc
-          cat << 'EOL' > .github/scripts/generate_sitemaps.py
-          #!/usr/bin/env python3
-          """
-          This script generates sitemaps for the main GitHub Pages site and updates references to project sitemaps.
-          """
-          import os
-          import requests
-          from bs4 import BeautifulSoup
-          import lxml.etree as ET
-
-          # Example sitemap generation
-          def generate_sitemap(url):
-              print(f"Generating sitemap for {url}")
-          EOL
+          python -m pip install --upgrade pip
+          pip install beautifulsoup4 requests
+      
+      - name: Check for content changes
+        id: check-changes
+        run: |
+          # Get list of changed files in the last commit
+          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD)
           
-          # Make the script executable
-          chmod +x .github/scripts/generate_sitemaps.py
+          # Check if any content files were changed
+          if echo "$CHANGED_FILES" | grep -q -E 'ai-llm-blog/.*\.(html|md|jpg|jpeg|png|gif|svg|webp|mp4|webm|ogg|mov)$|ai-llm-blog/(posts|tutorials|resources|community|help)/|assets/images/|ai-llm-blog/assets/images/'; then
+            echo "content_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "content_changed=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Generate sitemaps
+        if: steps.check-changes.outputs.content_changed == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        run: |
+          python ./github/scripts/generate_sitemaps.py
+      
+      - name: Commit sitemap files
+        if: steps.check-changes.outputs.content_changed == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
           
-          # Run the script
-          python .github/scripts/generate_sitemaps.py
+          # Check if there are changes to commit
+          if git status -s | grep -q "sitemap"; then
+            git add sitemap*.xml
+            git add ai-llm-blog/sitemap*.xml
+            git commit -m "Update sitemaps [skip ci]"
+            git push
+          else
+            echo "No changes to sitemaps detected"
+          fi

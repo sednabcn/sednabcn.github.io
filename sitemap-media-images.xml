@@ -1,0 +1,232 @@
+<?xml version="1.0" ?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://sednabcn.github.io/footer_cover.html</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/assets/images/mathtutor.png</image:loc>
+      <image:title>Dr. Ruperto Pedro Bonet Chaple</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/register.html</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/images/logo.png</image:loc>
+      <image:title>SiMLeng Logo</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/images/avatar.png</image:loc>
+      <image:title>User Avatar</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/images/teacher.png</image:loc>
+      <image:title>Math Tutor Image</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/index.html</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/assets/images/simleng-card.png</image:loc>
+      <image:title>Logo</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/assets/images/ai-llm-blog.png</image:loc>
+      <image:title>Background Image</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/_community/thank-you.md</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/thank-you.jpg</image:loc>
+      <image:title>Thank You</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/_includes/seo.html</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/_includes/{{ page_large_image }}</image:loc>
+      <image:title>{{ seo_title }}{% if paginator %}{% unless paginator.page == 1 %} {{ title_separator }} {{ site.data.ui-text[site.locale].page | default: "Page" }} {{ paginator.page }}{% endunless %}{% endif %}</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/_includes/head.html</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/_includes/{{ site.url }}{{ page.header.image }}</image:loc>
+      <image:title>{{ page.title | default: site.title }}</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/_includes/head/header.html</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/logo.png</image:loc>
+      <image:title>SiMLeng Logo</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/assets/images</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/assets/images/Book-NN-logo.jpeg</image:loc>
+      <image:title>Book Nn Logo</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/assets/images</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/assets/images/logo.png</image:loc>
+      <image:title>Logo</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/assets/images</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/assets/images/favicon-16x16.png</image:loc>
+      <image:title>Favicon 16X16</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/avatar.jpg</image:loc>
+      <image:title>Avatar</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/header-posts.jpg</image:loc>
+      <image:title>Header Posts</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/header-about.jpg</image:loc>
+      <image:title>Header About</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/home-banner.jpg</image:loc>
+      <image:title>Home Banner</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/header-help.jpg</image:loc>
+      <image:title>Header Help</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/tag-banner_.png</image:loc>
+      <image:title>Tag Banner </image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/thank-you.png</image:loc>
+      <image:title>Thank You</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/favicon-16x16.png</image:loc>
+      <image:title>Favicon 16X16</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images/resources</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/resources/resources-banner.png</image:loc>
+      <image:title>Resources Banner</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images/tutorials</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/tutorials/performance-optimization-banner.png</image:loc>
+      <image:title>Performance Optimization Banner</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images/tutorials</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/tutorials/advanced-features-banner.png</image:loc>
+      <image:title>Advanced Features Banner</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images/tutorials</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/tutorials/python-setup-banner.png</image:loc>
+      <image:title>Python Setup Banner</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images/tutorials</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/tutorials/tutorials-banner.png</image:loc>
+      <image:title>Tutorials Banner</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images/tags</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/tags/deployment-banner.png</image:loc>
+      <image:title>Deployment Banner</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images/tags</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/tags/tag-banner_.png</image:loc>
+      <image:title>Tag Banner </image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/category-banner.webp</image:loc>
+      <image:title>Category Banner</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/tag-archive-banner.webp</image:loc>
+      <image:title>Tag Archive Banner</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images/community</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/community/feed-req-subs.webp</image:loc>
+      <image:title>Feed Req Subs</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images/community</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/community/forum-banner.webp</image:loc>
+      <image:title>Forum Banner</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images/tutorials</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/tutorials/tutorials-banner.webp</image:loc>
+      <image:title>Tutorials Banner</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://sednabcn.github.io/ai-llm-blog/assets/images/posts</loc>
+    <image:image>
+      <image:loc>https://sednabcn.github.io/ai-llm-blog/assets/images/posts/ai-journey-header.webp</image:loc>
+      <image:title>Ai Journey Header</image:title>
+    </image:image>
+  </url>
+</urlset>
