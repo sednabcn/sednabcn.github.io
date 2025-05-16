@@ -1,27 +1,5 @@
-# robots.txt for https://sednabcn.github.io/
 User-agent: *
 Allow: /
 
-# Main sitemap index
+# Allow all web crawlers to access all content
 Sitemap: https://sednabcn.github.io/sitemap.xml
-
-# Additional sitemaps
-Sitemap: https://sednabcn.github.io/sitemap-main.xml
-Sitemap: https://sednabcn.github.io/sitemap-master.xml
-Sitemap: https://sednabcn.github.io/sitemap-ai-llm-blog.xml
-Sitemap: https://sednabcn.github.io/sitemap-frequency-daily.xml
-Sitemap: https://sednabcn.github.io/sitemap-frequency-weekly.xml
-Sitemap: https://sednabcn.github.io/sitemap-frequency-monthly.xml
-Sitemap: https://sednabcn.github.io/sitemap-frequency-index.xml
-Sitemap: https://sednabcn.github.io/sitemap-media-images.xml
-
-# Blog sitemaps
-Sitemap: https://sednabcn.github.io/ai-llm-blog/sitemap.xml
-Sitemap: https://sednabcn.github.io/ai-llm-blog/sitemap-main.xml
-Sitemap: https://sednabcn.github.io/ai-llm-blog/sitemap-posts.xml
-Sitemap: https://sednabcn.github.io/ai-llm-blog/sitemap-tags.xml
-Sitemap: https://sednabcn.github.io/ai-llm-blog/sitemap-categories.xml
-Sitemap: https://sednabcn.github.io/ai-llm-blog/sitemap-community.xml
-Sitemap: https://sednabcn.github.io/ai-llm-blog/sitemap-help.xml
-Sitemap: https://sednabcn.github.io/ai-llm-blog/sitemap-tutorials.xml
-Sitemap: https://sednabcn.github.io/ai-llm-blog/sitemap-resources.xml
