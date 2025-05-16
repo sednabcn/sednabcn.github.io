@@ -4,3 +4,13 @@ Allow: /
 
 # Main sitemap index
 Sitemap: https://sednabcn.github.io/sitemap.xml
+
+# Additional sitemaps
+Sitemap: https://sednabcn.github.io/sitemap-main.xml
+Sitemap: https://sednabcn.github.io/sitemap-master.xml
+Sitemap: https://sednabcn.github.io/sitemap-ai-llm-blog.xml
+Sitemap: https://sednabcn.github.io/sitemap-frequency-daily.xml
+Sitemap: https://sednabcn.github.io/sitemap-frequency-weekly.xml
+Sitemap: https://sednabcn.github.io/sitemap-frequency-monthly.xml
+Sitemap: https://sednabcn.github.io/sitemap-frequency-index.xml
+Sitemap: https://sednabcn.github.io/sitemap-media-images.xml
