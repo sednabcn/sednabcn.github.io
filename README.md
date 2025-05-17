@@ -7,8 +7,7 @@ This is the main GitHub Pages repository for my projects and research portfolio.
 ## Structure
 
 - `index.html` - Main landing page
-- `sitemap.xml` - Sitemap index file
-- `sitemap-main.xml` - Main sitemap for this site
+- `sitemap.xml` - Sitemap file contains all urls 
 - `robots.txt` - Instructions for search engine crawlers
 - `.nojekyll` - Tells GitHub Pages not to process this site with Jekyll
 
