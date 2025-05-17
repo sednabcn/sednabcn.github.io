@@ -1,1 +1,19 @@
-scripts
+# Ignore scripts directory in the root of the repository
+/scripts/
+
+# But don't ignore .github/scripts directory
+!/.github/scripts/
+
+# Other common ignores
+node_modules/
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.DS_Store
