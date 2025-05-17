@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 
 # Allow all web crawlers to access all content
-Sitemap: https://sednabcn.github.io/sitemap.xml
+Sitemap: https://sednabcn.github.io/sitemap_.txt
