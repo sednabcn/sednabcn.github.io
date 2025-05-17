@@ -1,0 +1,29 @@
+name: Sitemap Monitor
+
+on:
+  schedule:
+    - cron: '0 3 * * *'     # Daily at 03:00 UTC
+  workflow_dispatch:
+
+jobs:
+  monitor-sitemap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r .github/scripts/requirements.txt
+
+      - name: Write credentials to file
+        run: echo "$GOOGLE_API_CREDENTIALS" > client_secret.json
+        env:
+          GOOGLE_API_CREDENTIALS: ${{ secrets.GOOGLE_API_CREDENTIALS }}
+
+      - name: Run sitemap monitor & submit script
+        run: python .github/scripts/sitemap_check_and_submit.py
