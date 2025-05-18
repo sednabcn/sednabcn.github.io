@@ -1,67 +1,42 @@
 #!/usr/bin/env python3
-# Direct sitemap submission script that uses the exact working command pattern
+
+import os
 import subprocess
 import sys
 
 def main():
+    site_url = "https://sednabcn.github.io/"
+    sitemap_url = "https://sednabcn.github.io/sitemap.xml"
+    
     print("Starting direct sitemap submission...")
     
-    # Try different script path options
-    script_paths = [
-        ".github/scripts/submit_status_sitemap.py",
-        "./submit_status_sitemap.py",
-        "submit_status_sitemap.py",
-        "./.github/scripts/submit_status_sitemap.py",
-        "../submit_status_sitemap.py"
-    ]
+    # Since we know the submit_status_sitemap.py is in the same directory,
+    # call it directly without trying multiple paths
+    script_path = os.path.join(os.path.dirname(__file__), 'submit_status_sitemap.py')
     
-    success = False
+    print(f"Using script path: {script_path}")
+    command = ['python', script_path, '--site', site_url, '--sitemaps', sitemap_url]
+    print(f"Running command: {' '.join(command)}")
     
-    for script_path in script_paths:
-        print(f"\nTrying script path: {script_path}")
-        cmd = [
-            "python",
-            script_path,
-            "--site", "https://sednabcn.github.io/",
-            "--sitemaps", "https://sednabcn.github.io/sitemap.xml"
-        ]
-        
-        print(f"Running command: {' '.join(cmd)}")
-        
-        try:
-            # Run the command and capture output
-            result = subprocess.run(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                check=True
-            )
-            
-            # Print the output
-            print("Command succeeded!")
-            print("Output:")
+    try:
+        # Use capture_output to capture both stdout and stderr
+        result = subprocess.run(command, capture_output=True, text=True)
+        if result.returncode == 0:
+            print("Command executed successfully")
             print(result.stdout)
-            
-            success = True
-            break
-            
-        except subprocess.CalledProcessError as e:
-            # Print error details if the command fails
-            print(f"Command failed with exit code {e.returncode}")
-            print("Error output:")
-            print(e.stderr)
-            
-        except FileNotFoundError:
-            print(f"Script not found at path: {script_path}")
-    
-    if not success:
-        # Print additional debug info
-        print("\nAdditional debug information:")
-        print(f"Working directory: {subprocess.run(['pwd'], capture_output=True, text=True).stdout.strip()}")
-        print(f"Directory contents: {subprocess.run(['ls', '-la'], capture_output=True, text=True).stdout}")
-        print(f"Scripts directory: {subprocess.run(['ls', '-la', '.github/scripts'], capture_output=True, text=True, stderr=subprocess.STDOUT).stdout}")
-        
+        else:
+            print(f"Command failed with exit code {result.returncode}")
+            print(f"Error output:")
+            print(result.stderr)
+            print("\nAttempting to debug further:")
+            # List directory contents to check if the script is there
+            dir_path = os.path.dirname(__file__)
+            list_result = subprocess.run(['ls', '-la', dir_path], capture_output=True, text=True)
+            print(f"Directory contents of {dir_path}:")
+            print(list_result.stdout)
+            sys.exit(1)
+    except Exception as e:
+        print(f"Exception running command: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
