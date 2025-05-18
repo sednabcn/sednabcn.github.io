@@ -24,7 +24,7 @@ jobs:
           
       - name: Write credentials to file
         env:
-          CLIENT_SECRET: ${{ secrets.GOOGLE_API_CLIENT_SECRET }}
+          CLIENT_SECRET: ${{ secrets.GOOGLE_API_CREDENTIALS}}
         run: |
           echo "$CLIENT_SECRET" > client_secret.json
           
