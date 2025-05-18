@@ -24,8 +24,8 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pytz
-    
+        pip install pytz tabulate
+           
     - name: Generate updated sitemap
       run: |
         python .github/scripts/unified_sitemap_updater.py

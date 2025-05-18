@@ -1,6 +1,7 @@
 import subprocess
 import os
 import sys
+import tabulate
 
 SITE = "https://sednabcn.github.io/"
 SITEMAP = "https://sednabcn.github.io/sitemap.xml"
