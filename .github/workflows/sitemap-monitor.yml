@@ -1,9 +1,9 @@
-name: Sitemap Monitor
+name: Monitor Sitemap
 
 on:
   schedule:
-    - cron: '0 3 * * *'     # Daily at 03:00 UTC
-  workflow_dispatch:
+    - cron: '0 */12 * * *'  # Run every 12 hours
+  workflow_dispatch:  # Allow manual triggering
 
 jobs:
   monitor-sitemap:
@@ -11,19 +11,35 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
+        
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-
+          
       - name: Install dependencies
-        run: pip install -r .github/scripts/requirements.txt
-
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests google-api-python-client google-auth google-auth-httplib2
+          
       - name: Write credentials to file
-        run: echo "$GOOGLE_API_CREDENTIALS" > client_secret.json
         env:
-          GOOGLE_API_CREDENTIALS: ${{ secrets.GOOGLE_API_CREDENTIALS }}
-
-      - name: Run sitemap monitor & submit script
-        run: python .github/scripts/sitemap_check_and_submit.py --site "https://sednabcn.github.io/" --sitemap "sitemap.xml"
+          CLIENT_SECRET: ${{ secrets.GOOGLE_API_CLIENT_SECRET }}
+        run: |
+          echo "$CLIENT_SECRET" > client_secret.json
+          
+      - name: Environment diagnostic
+        run: |
+          pwd
+          ls -la
+          python --version
+          
+      - name: Debug environment
+        run: |
+          echo "GitHub workspace: $GITHUB_WORKSPACE"
+          echo "Script file exists:"
+          ls -la .github/scripts/
+          
+      - name: Run sitemap submit script
+        run: |
+          python .github/scripts/submit_status_sitemap.py --site https://sednabcn.github.io/ --sitemaps https://sednabcn.github.io/sitemap.xml
