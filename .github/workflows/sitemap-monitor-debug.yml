@@ -1,4 +1,4 @@
-name: Sitemap Monitor
+name: Sitemap Monitor Debug
 
 on:
   schedule:
