@@ -117,7 +117,7 @@ jobs:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
         run: |
           # Check if update_indexing_urls.py exists
-          if [ ! -f "update_indexing_urls.py" ]; then
+          if [ ! -f ".github/scripts/update_indexing_urls.py" ]; then
             echo "ERROR: update_indexing_urls.py script not found!"
             echo "::set-output name=status::missing_script"
             exit 1
@@ -126,7 +126,7 @@ jobs:
           # Check if this is the first run by looking for a hash file
           if [ ! -f ".sitemap_hash" ]; then
             echo "First-time setup - running full indexing"
-            python ./github/scripts/update_indexing_urls.py --site sednabcn.github.io --sitemap sitemap.xml
+            python .github/scripts/update_indexing_urls.py --site sednabcn.github.io --sitemap sitemap.xml
             INDEXING_STATUS=$?
             
             if [ $INDEXING_STATUS -eq 0 ]; then
