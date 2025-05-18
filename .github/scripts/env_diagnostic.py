@@ -1,87 +1,50 @@
 #!/usr/bin/env python3
-# Simple test script to verify Python environment and dependencies
-import sys
 import os
+import sys
+import platform
 import subprocess
 
-def run_check(description, check_fn):
-    """Run a check and print results"""
-    print(f"\n--- {description} ---")
-    try:
-        result = check_fn()
-        print(f"SUCCESS: {result}")
-        return True
-    except Exception as e:
-        print(f"FAILED: {str(e)}")
-        return False
-
-def check_python_version():
-    """Check Python version"""
-    return f"Python {sys.version}"
-
-def check_module(module_name):
-    """Check if a module can be imported"""
-    try:
-        __import__(module_name)
-        return f"Module '{module_name}' is available"
-    except ImportError as e:
-        return f"Module '{module_name}' not found: {str(e)}"
-
-def check_command(command):
-    """Run a shell command and return output"""
-    result = subprocess.run(command, shell=True, text=True, capture_output=True)
-    if result.returncode != 0:
-        raise Exception(f"Command failed with code {result.returncode}: {result.stderr}")
-    return result.stdout.strip()
-
 def main():
-    print("===== PYTHON ENVIRONMENT DIAGNOSTIC =====")
+    """Print diagnostic information about the environment"""
+    print("=== Environment Diagnostic ===")
     
-    # Check Python version
-    run_check("Python Version", check_python_version)
+    # Python information
+    print(f"Python version: {platform.python_version()}")
+    print(f"Python executable: {sys.executable}")
+    print(f"Python path: {sys.path}")
     
-    # Check key modules needed by the scripts
-    modules = [
-        "google.oauth2.credentials", 
-        "google_auth_oauthlib.flow",
-        "google.auth.transport.requests",
-        "googleapiclient.discovery",
-        "pickle", 
-        "tabulate", 
-        "argparse", 
-        "subprocess",
-        "os",
-        "sys"
-    ]
+    # Operating system information
+    print(f"Platform: {platform.platform()}")
+    print(f"System: {platform.system()}")
+    print(f"Release: {platform.release()}")
     
-    for module in modules:
-        run_check(f"Import {module}", lambda m=module: check_module(m))
+    # Environment variables
+    print("\nEnvironment Variables:")
+    for key, value in os.environ.items():
+        # Skip sensitive information
+        if "SECRET" in key or "TOKEN" in key or "PASSWORD" in key or "CREDENTIAL" in key:
+            print(f"{key}: [REDACTED]")
+        else:
+            print(f"{key}: {value}")
     
-    # Check for credential files
-    credential_files = ["client_secret.json", "token.pickle"]
-    for file in credential_files:
-        run_check(f"Check for {file}", lambda f=file: f"File exists: {os.path.exists(f)}")
+    # Check if client_secret.json exists
+    print("\nChecking for credentials file:")
+    if os.path.exists("client_secret.json"):
+        size = os.path.getsize("client_secret.json")
+        print(f"client_secret.json exists: {size} bytes")
+    else:
+        print("client_secret.json not found")
     
-    # Check file paths
-    script_paths = [
-        ".github/scripts/submit_status_sitemap.py",
-        "submit_status_sitemap.py"
-    ]
-    for path in script_paths:
-        run_check(f"Check script at {path}", lambda p=path: f"File exists: {os.path.exists(p)}")
+    # Installed packages
+    print("\nInstalled packages:")
+    try:
+        result = subprocess.run([sys.executable, "-m", "pip", "freeze"], 
+                                capture_output=True, text=True)
+        print(result.stdout)
+    except Exception as e:
+        print(f"Error checking installed packages: {e}")
     
-    # Check environment variables
-    env_vars = ["GITHUB_REPOSITORY", "GITHUB_REPOSITORY_OWNER", "GITHUB_WORKSPACE"]
-    for var in env_vars:
-        run_check(f"Environment variable {var}", lambda v=var: f"{v}={os.environ.get(v, 'Not set')}")
-    
-    # Check disk space
-    run_check("Disk space", lambda: check_command("df -h ."))
-    
-    # Check memory
-    run_check("Memory usage", lambda: check_command("free -m"))
-    
-    print("\n===== DIAGNOSTIC COMPLETE =====")
+    print("=== End of Diagnostic ===")
 
 if __name__ == "__main__":
     main()
