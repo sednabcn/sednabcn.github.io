@@ -28,9 +28,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests  # For broken link checking
-          # If your script has additional requirements, install them here
-          # pip install -r .github/scripts/requirements.txt
+          pip install requests google-api-python-client google-auth-oauthlib google-auth-httplib2 tabulate
       
       - name: Check for broken links
         id: link_check
@@ -110,76 +108,60 @@ jobs:
               labels: ['bug', 'sitemap']
             });
       
-      - name: Check sitemap and request indexing
-        id: indexing
+      - name: Write Google credentials to file
         env:
-          # Add the necessary secrets for Google Search Console authentication
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
         run: |
-          # Check if update_indexing_urls.py exists
-          if [ ! -f ".github/scripts/update_indexing_urls.py" ]; then
-            echo "ERROR: update_indexing_urls.py script not found!"
+          if [ -n "$GOOGLE_CREDENTIALS" ]; then
+            echo "$GOOGLE_CREDENTIALS" > client_secret.json
+            echo "Google credentials written to file"
+          else
+            echo "::error ::GOOGLE_CREDENTIALS secret is not set"
+            exit 1
+          fi
+      
+      - name: Check sitemap and request indexing
+        id: indexing
+        run: |
+          # Check if scripts exist
+          if [ ! -f ".github/scripts/sitemap_check_and_submit.py" ]; then
+            echo "::error ::sitemap_check_and_submit.py script not found!"
             echo "::set-output name=status::missing_script"
             exit 1
           fi
           
-          # Check if this is the first run by looking for a hash file
-          if [ ! -f ".sitemap_hash" ]; then
-            echo "First-time setup - running full indexing"
-            python .github/scripts/update_indexing_urls.py --site sednabcn.github.io --sitemap sitemap.xml
-            INDEXING_STATUS=$?
-            
-            if [ $INDEXING_STATUS -eq 0 ]; then
-              md5sum sitemap.xml | awk '{print $1}' > .sitemap_hash
-              echo "::set-output name=status::first_run_success"
-            else
-              echo "::set-output name=status::first_run_failed"
-              exit 1
-            fi
+          if [ ! -f ".github/scripts/submit_status_sitemap.py" ]; then
+            echo "::error ::submit_status_sitemap.py script not found!"
+            echo "::set-output name=status::missing_script"
+            exit 1
+          fi
+          
+          # Run the script
+          python .github/scripts/sitemap_check_and_submit.py --site "YOUR_DOMAIN_HERE" --sitemap sitemap.xml
+          
+          INDEXING_STATUS=$?
+          if [ $INDEXING_STATUS -eq 0 ]; then
+            echo "::set-output name=status::success"
           else
-            # Calculate current hash
-            CURRENT_HASH=$(md5sum sitemap.xml | awk '{print $1}')
-            STORED_HASH=$(cat .sitemap_hash)
-            
-            if [ "$CURRENT_HASH" != "$STORED_HASH" ]; then
-              echo "Sitemap has changed - updating indexing"
-              python .github/scripts/update_indexing_urls.py --site sednabcn.github.io --sitemap sitemap.xml
-              INDEXING_STATUS=$?
-              
-              if [ $INDEXING_STATUS -eq 0 ]; then
-                echo "$CURRENT_HASH" > .sitemap_hash
-                echo "::set-output name=status::update_success"
-              else
-                echo "::set-output name=status::update_failed"
-                exit 1
-              fi
-            else
-              echo "No changes in sitemap detected"
-              echo "::set-output name=status::no_changes"
-            fi
+            echo "::set-output name=status::failed"
+            exit 1
           fi
       
       - name: Send notification on success
-        if: steps.indexing.outputs.status == 'first_run_success' || steps.indexing.outputs.status == 'update_success'
+        if: steps.indexing.outputs.status == 'success'
         uses: actions/github-script@v6
         with:
           script: |
-            const status = '${{ steps.indexing.outputs.status }}';
-            const title = status === 'first_run_success' ? '✅ Initial sitemap indexing completed' : '✅ Sitemap indexing updated';
-            const body = status === 'first_run_success' 
-              ? 'Initial sitemap indexing has been successfully completed. All URLs have been submitted to Google Search Console for indexing.'
-              : 'Your sitemap has changed and the updated URLs have been successfully submitted to Google Search Console for indexing.';
-            
             github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: title,
-              body: body,
+              title: '✅ Sitemap indexing completed',
+              body: 'Sitemap has been successfully submitted to Google Search Console for indexing.',
               labels: ['info', 'sitemap']
             });
       
       - name: Send notification on failure
-        if: steps.indexing.outputs.status == 'missing_script' || steps.indexing.outputs.status == 'first_run_failed' || steps.indexing.outputs.status == 'update_failed'
+        if: steps.indexing.outputs.status == 'missing_script' || steps.indexing.outputs.status == 'failed'
         uses: actions/github-script@v6
         with:
           script: |
@@ -188,13 +170,10 @@ jobs:
             
             if (status === 'missing_script') {
               title = '❌ Sitemap indexing failed - Missing script';
-              body = 'The update_indexing_urls.py script was not found in the repository. Please make sure the script exists and is in the root directory.';
-            } else if (status === 'first_run_failed') {
-              title = '❌ Initial sitemap indexing failed';
-              body = 'The initial sitemap indexing process has failed. Please check the workflow logs for more details.';
+              body = 'One or more required Python scripts were not found in the repository. Please check that the scripts exist in the .github/scripts/ directory.';
             } else {
-              title = '❌ Sitemap indexing update failed';
-              body = 'The sitemap has changed, but the indexing process has failed. Please check the workflow logs for more details.';
+              title = '❌ Sitemap indexing failed';
+              body = 'The sitemap indexing process has failed. Please check the workflow logs for more details.';
             }
             
             github.rest.issues.create({
@@ -204,11 +183,3 @@ jobs:
               body: body,
               labels: ['bug', 'sitemap']
             });
-      
-      - name: Commit hash file if changed
-        run: |
-          git config --global user.name 'GitHub Action'
-          git config --global user.email 'action@github.com'
-          git add .sitemap_hash
-          git diff --quiet && git diff --staged --quiet || git commit -m "Update sitemap hash [skip ci]"
-          git push
