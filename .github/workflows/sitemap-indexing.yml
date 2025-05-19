@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -40,11 +40,19 @@ jobs:
           import sys
           import xml.etree.ElementTree as ET
           import requests
+          import os
           
           # Define namespace for sitemap
           ns = {'sitemap': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
           
           try:
+              # Check if sitemap exists
+              if not os.path.exists('sitemap.xml'):
+                  print("sitemap.xml not found in repository")
+                  with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+                      print("broken_links=missing_sitemap", file=fh)
+                  sys.exit(2)
+                  
               # Parse sitemap
               tree = ET.parse('sitemap.xml')
               root = tree.getroot()
@@ -68,19 +76,34 @@ jobs:
                       for link in broken_links:
                           f.write(f"{link}\n")
                   print(f"Found {len(broken_links)} broken links")
-                  print("::set-output name=broken_links::true")
+                  with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+                      print("broken_links=true", file=fh)
                   sys.exit(1)
               else:
                   print("No broken links found")
-                  print("::set-output name=broken_links::false")
+                  with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+                      print("broken_links=false", file=fh)
                   sys.exit(0)
                   
           except Exception as e:
               print(f"Error checking sitemap: {str(e)}")
-              print("::set-output name=broken_links::error")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+                  print("broken_links=error", file=fh)
               sys.exit(2)
           EOF
         continue-on-error: true
+      
+      - name: Validate Google credentials before proceeding
+        id: validate_creds
+        run: |
+          if [ -z "${{ secrets.GOOGLE_API_CREDENTIALS }}" ]; then
+            echo "::error: GOOGLE_API_CREDENTIALS secret is not configured. Please add it to your repository secrets."
+            echo "broken_links=false" >> $GITHUB_OUTPUT
+            echo "credentials_valid=false" >> $GITHUB_OUTPUT
+            exit 0  # Continue workflow but mark credentials as invalid
+          else
+            echo "credentials_valid=true" >> $GITHUB_OUTPUT
+          fi
       
       - name: Send notification on broken links
         if: steps.link_check.outputs.broken_links == 'true'
@@ -88,62 +111,181 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const brokenLinks = fs.readFileSync('broken_links.txt', 'utf8');
-            
-            const issueTitle = '🚨 Broken links detected in sitemap';
-            const issueBody = `## Broken Links Report
-            
-            The sitemap indexing workflow has detected broken links in your sitemap.xml file.
-            
-            ### Details
-            ${brokenLinks}
-            
-            Please fix these links before they are submitted to Google Search Console.`;
-            
-            github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: issueTitle,
-              body: issueBody,
-              labels: ['bug', 'sitemap']
-            });
+            try {
+              if (fs.existsSync('broken_links.txt')) {
+                const brokenLinks = fs.readFileSync('broken_links.txt', 'utf8');
+                
+                const issueTitle = '🚨 Broken links detected in sitemap';
+                const issueBody = `## Broken Links Report
+                
+                The sitemap indexing workflow has detected broken links in your sitemap.xml file.
+                
+                ### Details
+                ${brokenLinks}
+                
+                Please fix these links before they are submitted to Google Search Console.`;
+                
+                github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: issueTitle,
+                  body: issueBody,
+                  labels: ['bug', 'sitemap']
+                });
+              } else {
+                console.log("broken_links.txt file not found, but broken links were reported");
+              }
+            } catch (error) {
+              console.error(`Error creating issue: ${error}`);
+            }
       
       - name: Write Google credentials to file
+        if: steps.validate_creds.outputs.credentials_valid == 'true'
         env:
-          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+         GOOGLE_API_CREDENTIALS: ${{ secrets.GOOGLE_API_CREDENTIALS }}
         run: |
-          if [ -n "$GOOGLE_CREDENTIALS" ]; then
-            echo "$GOOGLE_CREDENTIALS" > client_secret.json
-            echo "Google credentials written to file"
-          else
-            echo "::error ::GOOGLE_CREDENTIALS secret is not set"
-            exit 1
-          fi
+          echo "GOOGLE_API_CREDENTIALS" > client_secret.json
+          echo "Google credentials written to file"
       
-      - name: Check sitemap and request indexing
-        id: indexing
+      - name: Check for required scripts
+        id: check_scripts
+        if: steps.validate_creds.outputs.credentials_valid == 'true'
         run: |
-          # Check if scripts exist
+          SCRIPTS_EXIST=true
+          
           if [ ! -f ".github/scripts/sitemap_check_and_submit.py" ]; then
-            echo "::error ::sitemap_check_and_submit.py script not found!"
-            echo "::set-output name=status::missing_script"
-            exit 1
+            echo "::warning::sitemap_check_and_submit.py script not found. Creating a default script..."
+            mkdir -p .github/scripts
+            
+            cat > .github/scripts/sitemap_check_and_submit.py << 'EOF'
+import argparse
+import sys
+import xml.etree.ElementTree as ET
+import requests
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+
+def main():
+    parser = argparse.ArgumentParser(description='Check and submit sitemap to Google')
+    parser.add_argument('--site', required=True, help='Site URL')
+    parser.add_argument('--sitemap', required=True, help='Path to sitemap file')
+    args = parser.parse_args()
+    
+    # Load credentials
+    try:
+        credentials = service_account.Credentials.from_service_account_file(
+            'client_secret.json',
+            scopes=['https://www.googleapis.com/auth/webmasters']
+        )
+        service = build('webmasters', 'v3', credentials=credentials)
+        print(f"Successfully authenticated with Google Search Console API")
+    except Exception as e:
+        print(f"Error authenticating: {e}")
+        return 1
+    
+    # Submit sitemap
+    site_url = args.site
+    sitemap_url = f"{site_url}/{args.sitemap}"
+    
+    try:
+        service.sitemaps().submit(siteUrl=site_url, feedpath=sitemap_url).execute()
+        print(f"Successfully submitted sitemap {sitemap_url} to Google Search Console")
+        return 0
+    except HttpError as e:
+        print(f"API error: {e}")
+        return 1
+    except Exception as e:
+        print(f"Error submitting sitemap: {e}")
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(main())
+EOF
           fi
           
           if [ ! -f ".github/scripts/submit_status_sitemap.py" ]; then
-            echo "::error ::submit_status_sitemap.py script not found!"
-            echo "::set-output name=status::missing_script"
-            exit 1
+            echo "::warning::submit_status_sitemap.py script not found. Creating a default script..."
+            mkdir -p .github/scripts
+            
+            cat > .github/scripts/submit_status_sitemap.py << 'EOF'
+import argparse
+import sys
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+
+def main():
+    parser = argparse.ArgumentParser(description='Check sitemap status in Google Search Console')
+    parser.add_argument('--site', required=True, help='Site URL')
+    args = parser.parse_args()
+    
+    # Load credentials
+    try:
+        credentials = service_account.Credentials.from_service_account_file(
+            'client_secret.json',
+            scopes=['https://www.googleapis.com/auth/webmasters']
+        )
+        service = build('webmasters', 'v3', credentials=credentials)
+        print(f"Successfully authenticated with Google Search Console API")
+    except Exception as e:
+        print(f"Error authenticating: {e}")
+        return 1
+    
+    # Check sitemap status
+    try:
+        site_url = args.site
+        sitemaps = service.sitemaps().list(siteUrl=site_url).execute()
+        
+        if 'sitemap' in sitemaps:
+            print("\nSitemap Status:")
+            print("=" * 50)
+            for sitemap in sitemaps['sitemap']:
+                print(f"URL: {sitemap.get('path')}")
+                print(f"Status: {sitemap.get('lastSubmitted', 'Never submitted')}")
+                print(f"Errors: {sitemap.get('errors', '0')}")
+                print(f"Warnings: {sitemap.get('warnings', '0')}")
+                print("-" * 50)
+        else:
+            print("No sitemaps found for this site.")
+        
+        return 0
+    except HttpError as e:
+        print(f"API error: {e}")
+        return 1
+    except Exception as e:
+        print(f"Error checking sitemap status: {e}")
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(main())
+EOF
           fi
           
-          # Run the script
-          python .github/scripts/sitemap_check_and_submit.py --site "YOUR_DOMAIN_HERE" --sitemap sitemap.xml
+          chmod +x .github/scripts/sitemap_check_and_submit.py
+          chmod +x .github/scripts/submit_status_sitemap.py
+          echo "scripts_exist=true" >> $GITHUB_OUTPUT
+      
+      - name: Check sitemap and request indexing
+        id: indexing
+        if: steps.validate_creds.outputs.credentials_valid == 'true' && steps.check_scripts.outputs.scripts_exist == 'true'
+        run: |
+          # Run the script with your actual domain 
+          # Replace YOUR_DOMAIN_HERE with your actual domain, including https://
+          SITE_URL="https://sednabcn.github.io"
+          
+          echo "Submitting sitemap to Google Search Console..."
+          python .github/scripts/sitemap_check_and_submit.py --site "$SITE_URL" --sitemap sitemap.xml
           
           INDEXING_STATUS=$?
           if [ $INDEXING_STATUS -eq 0 ]; then
-            echo "::set-output name=status::success"
+            echo "status=success" >> $GITHUB_OUTPUT
+            
+            # Check sitemap status
+            echo "Checking sitemap status..."
+            python .github/scripts/submit_status_sitemap.py --site "$SITE_URL"
           else
-            echo "::set-output name=status::failed"
+            echo "status=failed" >> $GITHUB_OUTPUT
             exit 1
           fi
       
@@ -152,34 +294,48 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: '✅ Sitemap indexing completed',
-              body: 'Sitemap has been successfully submitted to Google Search Console for indexing.',
-              labels: ['info', 'sitemap']
-            });
+            try {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '✅ Sitemap indexing completed',
+                body: 'Sitemap has been successfully submitted to Google Search Console for indexing.',
+                labels: ['info', 'sitemap']
+              });
+            } catch (error) {
+              console.error(`Error creating success issue: ${error}`);
+            }
       
-      - name: Send notification on failure
-        if: steps.indexing.outputs.status == 'missing_script' || steps.indexing.outputs.status == 'failed'
+      - name: Send notification on missing credentials
+        if: steps.validate_creds.outputs.credentials_valid == 'false'
         uses: actions/github-script@v6
         with:
           script: |
-            const status = '${{ steps.indexing.outputs.status }}';
-            let title, body;
-            
-            if (status === 'missing_script') {
-              title = '❌ Sitemap indexing failed - Missing script';
-              body = 'One or more required Python scripts were not found in the repository. Please check that the scripts exist in the .github/scripts/ directory.';
-            } else {
-              title = '❌ Sitemap indexing failed';
-              body = 'The sitemap indexing process has failed. Please check the workflow logs for more details.';
+            try {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '⚠️ Google Search Console credentials missing',
+                body: 'The sitemap indexing workflow could not proceed because the GOOGLE_API_CREDENTIALS secret is not configured. Please add it to your repository secrets.',
+                labels: ['bug', 'sitemap']
+              });
+            } catch (error) {
+              console.error(`Error creating credential issue: ${error}`);
             }
-            
-            github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: title,
-              body: body,
-              labels: ['bug', 'sitemap']
-            });
+      
+      - name: Send notification on failure
+        if: steps.indexing.outputs.status == 'failed'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            try {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '❌ Sitemap indexing failed',
+                body: 'The sitemap indexing process has failed. Please check the workflow logs for more details.',
+                labels: ['bug', 'sitemap']
+              });
+            } catch (error) {
+              console.error(`Error creating failure issue: ${error}`);
+            }
