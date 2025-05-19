@@ -7,8 +7,16 @@ on:
 
   workflow_dispatch:
     inputs:
-      force_submit:
-        description: 'Force submission even if there are broken links'
+      validate_links:
+        description: 'Check for broken links before submitting?'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      check_only:
+        description: 'Only check sitemap status (no submit)?'
         required: false
         default: 'false'
         type: choice
@@ -17,7 +25,7 @@ on:
           - 'false'
 
   schedule:
-    - cron: '0 0 1 * *'  # Monthly at midnight on the first
+    - cron: '0 0 1 * *'
 
 jobs:
   index-sitemap:
@@ -37,87 +45,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests
 
-      - name: Create sitemap submission script
-        run: |
-          mkdir -p .github/scripts
-          cat > .github/scripts/submit_sitemap.py << 'EOF'
-#!/usr/bin/env python3
-
-import argparse
-import os
-import sys
-import xml.etree.ElementTree as ET
-import requests
-from typing import List
-import time
-
-SITEMAP_PATH = "sitemap.xml"
-GOOGLE_PING_URL = "https://www.google.com/ping?sitemap="
-
-def parse_sitemap(file_path: str) -> List[str]:
-    try:
-        tree = ET.parse(file_path)
-        root = tree.getroot()
-        namespace = {'ns': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
-        urls = [url.find('ns:loc', namespace).text for url in root.findall('ns:url', namespace)]
-        return urls
-    except Exception as e:
-        print(f"Error parsing sitemap: {e}")
-        return []
-
-def check_urls(urls: List[str]) -> List[str]:
-    broken = []
-    for url in urls:
-        try:
-            response = requests.head(url, allow_redirects=True, timeout=10)
-            if response.status_code >= 400:
-                broken.append(url)
-        except Exception as e:
-            print(f"Error checking {url}: {e}")
-            broken.append(url)
-    return broken
-
-def submit_to_google(sitemap_url: str):
-    ping_url = GOOGLE_PING_URL + sitemap_url
-    try:
-        response = requests.get(ping_url)
-        if response.status_code == 200:
-            print(f"✅ Successfully submitted sitemap to Google: {sitemap_url}")
-        else:
-            print(f"⚠️ Failed to submit sitemap. Status code: {response.status_code}")
-    except Exception as e:
-        print(f"❌ Error submitting sitemap: {e}")
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--force', action='store_true', help='Force submit even if there are broken links')
-    parser.add_argument('--sitemap-url', type=str, required=True, help='Public URL of your sitemap (e.g. https://example.com/sitemap.xml)')
-    args = parser.parse_args()
-
-    if not os.path.exists(SITEMAP_PATH):
-        print(f"❌ {SITEMAP_PATH} not found!")
-        sys.exit(1)
-
-    urls = parse_sitemap(SITEMAP_PATH)
-    print(f"🔍 Found {len(urls)} URLs in sitemap.")
-
-    broken = check_urls(urls)
-    if broken and not args.force:
-        print(f"❌ Found {len(broken)} broken URLs. Submission aborted.")
-        for url in broken:
-            print(f" - {url}")
-        sys.exit(1)
-    elif broken and args.force:
-        print(f"⚠️ Found {len(broken)} broken URLs, but proceeding due to --force.")
-
-    submit_to_google(args.sitemap_url)
-
-if __name__ == "__main__":
-    main()
-EOF
-
-      - name: Run Sitemap Submission
+      - name: Run Sitemap Tool
         run: |
           python .github/scripts/submit_sitemap.py \
-            --sitemap-url "https://sednabcn.github.io/sitemap.xml" \
-            ${{ github.event.inputs.force_submit == 'true' && '--force' || '' }}
+            --sitemap sitemap.xml \
+            --site "https://sednabcn.github.io" \
+            ${{ github.event.inputs.validate_links == 'true' && '--validate-links' || '' }} \
+            ${{ github.event.inputs.check_only == 'true' && '--check-only' || '' }}
+
+      - name: Submit URLs to Bing
+        run: |
+          python .github/scripts/submit_sitemap_bing.py \
+            --sitemap sitemap.xml \
+            --site "https://sednabcn.github.io"
+        env:
+          BING_API_KEY: ${{ secrets.BING_API_KEY }}
