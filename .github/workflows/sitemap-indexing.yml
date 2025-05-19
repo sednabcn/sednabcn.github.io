@@ -1,12 +1,10 @@
 name: Google Sitemap Indexing
 
 on:
-  # Trigger when sitemap.xml is modified in a push
   push:
     paths:
       - 'sitemap.xml'
-  
-  # Allow manual triggering through GitHub Actions interface
+
   workflow_dispatch:
     inputs:
       force_submit:
@@ -17,23 +15,23 @@ on:
         options:
           - 'true'
           - 'false'
-  
-  # Run monthly as a backup validation
+
   schedule:
-    - cron: '0 0 1 * *'  # At midnight on the first day of each month
+    - cron: '0 0 1 * *'  # Monthly at midnight on the first
 
 jobs:
   index-sitemap:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.12'
-      
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -45,511 +43,81 @@ jobs:
           cat > .github/scripts/submit_sitemap.py << 'EOF'
 #!/usr/bin/env python3
 
-# Enhanced Google Sitemap Submission Tool
-# Combines checking and submission functionality into a single script.
-
 import argparse
 import os
 import sys
 import xml.etree.ElementTree as ET
 import requests
-from typing import List, Dict, Optional, Tuple
-import json
+from typing import List
 import time
 
-# Set up global constants
-USER_AGENT = "Mozilla/5.0 (compatible; SitemapSubmitter/1.0; +https://github.com/sitemap-tools)"
-SEARCH_CONSOLE_API_BASE = "https://www.googleapis.com/webmasters/v3"
-SITEMAP_NAMESPACE = {'sitemap': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
+SITEMAP_PATH = "sitemap.xml"
+GOOGLE_PING_URL = "https://www.google.com/ping?sitemap="
 
-class SitemapTool:
-    def __init__(self, site_url: str, sitemap_path: str, credentials_path: Optional[str] = None, verbose: bool = False):
-        self.site_url = site_url.rstrip('/')
-        self.sitemap_path = sitemap_path
-        self.credentials_path = credentials_path
-        self.verbose = verbose
-        
-        # Determine full sitemap URL
-        if not sitemap_path.startswith('http'):
-            self.sitemap_url = f"{self.site_url}/{sitemap_path.lstrip('/')}"
-        else:
-            self.sitemap_url = sitemap_path
-            
-        # Pre-initialize tokens to None
-        self.access_token = None
-    
-    def log(self, message: str) -> None:
-        """Print messages if verbose mode is enabled"""
-        if self.verbose:
-            print(message)
-    
-    def get_auth_token(self) -> Optional[str]:
-        """Get auth token from credentials file or environment"""
-        if not self.credentials_path:
-            return None
-            
-        if not os.path.exists(self.credentials_path):
-            print(f"Error: Credentials file not found at {self.credentials_path}")
-            return None
-            
-        try:
-            with open(self.credentials_path, 'r') as f:
-                creds = json.load(f)
-                
-            if 'private_key' in creds:
-                # This is a service account credentials file
-                # For simplicity, we'll assume the token is already properly set up
-                # In a real implementation, you'd use google-auth library to get a token
-                print("Service account credentials found. In a real implementation, we'd use")
-                print("google-auth to acquire a token. For this example, please use")
-                print("an access token directly.")
-                return None
-            elif 'access_token' in creds:
-                return creds['access_token']
-                
-        except Exception as e:
-            print(f"Error reading credentials: {e}")
-            
-        return None
-        
-    def validate_sitemap(self) -> Tuple[bool, List[str]]:
-        """Validate sitemap exists and contains valid URLs"""
-        urls = []
-        
-        # If sitemap is a URL, try to download it first
-        if self.sitemap_path.startswith('http'):
-            try:
-                response = requests.get(self.sitemap_path, headers={'User-Agent': USER_AGENT})
-                if response.status_code != 200:
-                    print(f"Error: Could not download sitemap. Status code: {response.status_code}")
-                    return False, []
-                    
-                sitemap_content = response.text
-                root = ET.fromstring(sitemap_content)
-            except Exception as e:
-                print(f"Error downloading sitemap: {e}")
-                return False, []
-        else:
-            # Local file
-            if not os.path.exists(self.sitemap_path):
-                print(f"Error: Sitemap file not found at {self.sitemap_path}")
-                return False, []
-            
-            try:
-                tree = ET.parse(self.sitemap_path)
-                root = tree.getroot()
-            except Exception as e:
-                print(f"Error parsing sitemap: {e}")
-                return False, []
-        
-        # Find all URLs
-        try:
-            for url in root.findall('.//sitemap:loc', SITEMAP_NAMESPACE):
-                urls.append(url.text)
-                
-            if not urls:
-                print("Error: No URLs found in sitemap")
-                return False, []
-                
-            print(f"Found {len(urls)} URLs in sitemap")
-            return True, urls
-        except Exception as e:
-            print(f"Error parsing sitemap URLs: {e}")
-            return False, []
-    
-    def check_links(self, urls: List[str]) -> List[Dict]:
-        """Check all links in the sitemap for broken URLs"""
-        broken_links = []
-        
-        print(f"Checking {len(urls)} links for availability...")
-        for index, url in enumerate(urls):
-            try:
-                response = requests.head(url, headers={'User-Agent': USER_AGENT}, timeout=10, allow_redirects=True)
-                
-                if response.status_code >= 400:
-                    print(f"❌ Broken link ({response.status_code}): {url}")
-                    broken_links.append({
-                        'url': url,
-                        'status': response.status_code,
-                        'error': f"HTTP {response.status_code}"
-                    })
-                else:
-                    self.log(f"✅ Valid link: {url}")
-                    
-                # Add small delay to avoid rate limiting
-                if index > 0 and index % 10 == 0:
-                    time.sleep(1)
-                    
-            except requests.exceptions.RequestException as e:
-                print(f"❌ Error checking: {url}")
-                print(f"   {str(e)}")
-                broken_links.append({
-                    'url': url,
-                    'status': -1,
-                    'error': str(e)
-                })
-        
-        return broken_links
-    
-    def check_sitemap_status(self) -> Dict:
-        """Check if sitemap is already submitted and indexed by Google"""
-        if not self.access_token:
-            self.access_token = self.get_auth_token()
-            
-        if not self.access_token:
-            return {
-                'success': False,
-                'status': 'UNKNOWN',
-                'message': 'No valid authentication token available'
-            }
-        
-        sitemap_basename = os.path.basename(self.sitemap_url)
-        
-        # Format site for API (add sc-domain: prefix if needed)
-        api_site_url = self.site_url
-        if not api_site_url.startswith('sc-domain:') and not api_site_url.startswith('http'):
-            api_site_url = f"https://{api_site_url}"
-        
-        if 'github.io' in api_site_url and not api_site_url.startswith('sc-domain:'):
-            api_site_url = f"sc-domain:{api_site_url.split('://')[1]}"
-        
-        # Google Search Console API endpoint for sitemaps
-        api_url = f"{SEARCH_CONSOLE_API_BASE}/sites/{requests.utils.quote(api_site_url)}/sitemaps/{requests.utils.quote(sitemap_basename)}"
-        
-        headers = {
-            'Authorization': f"Bearer {self.access_token}",
-            'User-Agent': USER_AGENT,
-            'Content-Type': 'application/json'
-        }
-        
-        try:
-            response = requests.get(api_url, headers=headers)
-            
-            if response.status_code == 200:
-                sitemap_data = response.json()
-                return {
-                    'success': True,
-                    'status': sitemap_data.get('lastSubmitted', 'UNKNOWN'),
-                    'lastDownloaded': sitemap_data.get('lastDownloaded', 'NEVER'),
-                    'isPending': sitemap_data.get('isPending', False),
-                    'message': 'Sitemap found in Google Search Console'
-                }
-            elif response.status_code == 404:
-                return {
-                    'success': True,
-                    'status': 'NOT_FOUND',
-                    'message': 'Sitemap not found in Google Search Console'
-                }
-            else:
-                return {
-                    'success': False,
-                    'status': 'ERROR',
-                    'message': f"API Error: {response.status_code} - {response.text}"
-                }
-                
-        except Exception as e:
-            return {
-                'success': False,
-                'status': 'ERROR',
-                'message': f"Exception: {str(e)}"
-            }
-    
-    def submit_sitemap(self) -> Dict:
-        """Submit sitemap to Google Search Console"""
-        if not self.access_token:
-            self.access_token = self.get_auth_token()
-            
-        if not self.access_token:
-            return {
-                'success': False,
-                'message': 'No valid authentication token available'
-            }
-        
-        sitemap_basename = os.path.basename(self.sitemap_url)
-        
-        # Format site for API (add sc-domain: prefix if needed)
-        api_site_url = self.site_url
-        if not api_site_url.startswith('sc-domain:') and not api_site_url.startswith('http'):
-            api_site_url = f"https://{api_site_url}"
-        
-        if 'github.io' in api_site_url and not api_site_url.startswith('sc-domain:'):
-            api_site_url = f"sc-domain:{api_site_url.split('://')[1]}"
-        
-        # Google Search Console API endpoint for submitting sitemaps
-        api_url = f"{SEARCH_CONSOLE_API_BASE}/sites/{requests.utils.quote(api_site_url)}/sitemaps/{requests.utils.quote(sitemap_basename)}"
-        
-        headers = {
-            'Authorization': f"Bearer {self.access_token}",
-            'User-Agent': USER_AGENT,
-            'Content-Type': 'application/json'
-        }
-        
-        try:
-            # This is a PUT request for sitemap submission
-            response = requests.put(api_url, headers=headers)
-            
-            if response.status_code in (200, 204):
-                return {
-                    'success': True,
-                    'message': f"Sitemap {sitemap_basename} successfully submitted"
-                }
-            else:
-                return {
-                    'success': False,
-                    'message': f"API Error: {response.status_code} - {response.text}"
-                }
-                
-        except Exception as e:
-            return {
-                'success': False,
-                'message': f"Exception: {str(e)}"
-            }
+def parse_sitemap(file_path: str) -> List[str]:
+    try:
+        tree = ET.parse(file_path)
+        root = tree.getroot()
+        namespace = {'ns': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
+        urls = [url.find('ns:loc', namespace).text for url in root.findall('ns:url', namespace)]
+        return urls
+    except Exception as e:
+        print(f"Error parsing sitemap: {e}")
+        return []
 
-def detect_github_site_url() -> Optional[str]:
-    """Auto-detect site URL from GitHub Actions environment variables"""
-    github_repo_owner = os.environ.get('GITHUB_REPOSITORY_OWNER')
-    github_repo = os.environ.get('GITHUB_REPOSITORY')
-    
-    if github_repo and github_repo_owner:
-        # Extract repository name from the full repository path (owner/repo)
-        repo_name = github_repo.split('/')[-1]
-        site_url = f"https://{github_repo_owner}.github.io/{repo_name}"
-        return site_url
-    
-    return None
+def check_urls(urls: List[str]) -> List[str]:
+    broken = []
+    for url in urls:
+        try:
+            response = requests.head(url, allow_redirects=True, timeout=10)
+            if response.status_code >= 400:
+                broken.append(url)
+        except Exception as e:
+            print(f"Error checking {url}: {e}")
+            broken.append(url)
+    return broken
+
+def submit_to_google(sitemap_url: str):
+    ping_url = GOOGLE_PING_URL + sitemap_url
+    try:
+        response = requests.get(ping_url)
+        if response.status_code == 200:
+            print(f"✅ Successfully submitted sitemap to Google: {sitemap_url}")
+        else:
+            print(f"⚠️ Failed to submit sitemap. Status code: {response.status_code}")
+    except Exception as e:
+        print(f"❌ Error submitting sitemap: {e}")
 
 def main():
-    parser = argparse.ArgumentParser(description='Check and submit sitemap to Google Search Console')
-    parser.add_argument('--site', help='Site URL (e.g., https://example.com)')
-    parser.add_argument('--sitemap', default='sitemap.xml', help='Sitemap path or URL (e.g., sitemap.xml)')
-    parser.add_argument('--credentials', help='Path to Google API credentials JSON file')
-    parser.add_argument('--check-only', action='store_true', help='Only check sitemap status without submitting')
-    parser.add_argument('--validate-links', action='store_true', help='Validate all URLs in the sitemap')
-    parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose output')
-    parser.add_argument('--force', action='store_true', help='Force submission even if links are broken')
-    
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--force', action='store_true', help='Force submit even if there are broken links')
+    parser.add_argument('--sitemap-url', type=str, required=True, help='Public URL of your sitemap (e.g. https://example.com/sitemap.xml)')
     args = parser.parse_args()
-    
-    # Auto-detect site URL if not provided
-    site_url = args.site
-    if not site_url:
-        site_url = detect_github_site_url()
-        if site_url:
-            print(f"Auto-detected site URL: {site_url}")
-        else:
-            print("Error: Site URL not provided and could not be auto-detected")
-            print("Please specify --site parameter or run this in a GitHub Actions environment")
-            sys.exit(1)
-    
-    # Initialize sitemap tool
-    tool = SitemapTool(
-        site_url=site_url,
-        sitemap_path=args.sitemap,
-        credentials_path=args.credentials,
-        verbose=args.verbose
-    )
-    
-    # Validate sitemap structure
-    is_valid, urls = tool.validate_sitemap()
-    if not is_valid:
-        print("Error: Invalid sitemap")
+
+    if not os.path.exists(SITEMAP_PATH):
+        print(f"❌ {SITEMAP_PATH} not found!")
         sys.exit(1)
-    
-    # Check links if requested
-    broken_links = []
-    if args.validate_links:
-        broken_links = tool.check_links(urls)
-        if broken_links and not args.force:
-            print(f"\n❌ Found {len(broken_links)} broken links:")
-            for link in broken_links:
-                print(f"  - {link['url']} (Error: {link['error']})")
-            print("\nFix broken links before submitting sitemap to Google.")
-            print("Or use --force to submit anyway.")
-            # Write broken links to file for GitHub Action
-            with open('broken_links.txt', 'w') as f:
-                for link in broken_links:
-                    f.write(f"{link['url']} (Error: {link['error']})\n")
-            sys.exit(1)
-        elif broken_links and args.force:
-            print(f"\n⚠️ Found {len(broken_links)} broken links but continuing due to --force flag")
-        else:
-            print("✅ All links in sitemap are valid")
-    
-    # Check current sitemap status
-    print(f"\nChecking sitemap status for {tool.sitemap_url}...")
-    status = tool.check_sitemap_status()
-    
-    if status['success']:
-        print(f"Sitemap status: {status['status']}")
-        if 'lastDownloaded' in status:
-            print(f"Last downloaded: {status['lastDownloaded']}")
-        
-        if status['status'] == 'NOT_FOUND' or status.get('lastDownloaded') == 'NEVER':
-            if args.check_only:
-                print("Sitemap not found or never downloaded. Use without --check-only to submit.")
-            else:
-                print("\nSubmitting sitemap to Google Search Console...")
-                result = tool.submit_sitemap()
-                if result['success']:
-                    print(f"✅ {result['message']}")
-                else:
-                    print(f"❌ {result['message']}")
-        else:
-            print("✅ Sitemap already submitted and indexed by Google")
-    else:
-        print(f"❌ Error checking sitemap status: {status['message']}")
-        if args.credentials:
-            print(f"Check that your credentials file at {args.credentials} is valid")
-        else:
-            print("No credentials provided. Use --credentials to specify Google API credentials file")
+
+    urls = parse_sitemap(SITEMAP_PATH)
+    print(f"🔍 Found {len(urls)} URLs in sitemap.")
+
+    broken = check_urls(urls)
+    if broken and not args.force:
+        print(f"❌ Found {len(broken)} broken URLs. Submission aborted.")
+        for url in broken:
+            print(f" - {url}")
+        sys.exit(1)
+    elif broken and args.force:
+        print(f"⚠️ Found {len(broken)} broken URLs, but proceeding due to --force.")
+
+    submit_to_google(args.sitemap_url)
 
 if __name__ == "__main__":
     main()
 EOF
-          chmod +x .github/scripts/submit_sitemap.py
-      
-      - name: Validate sitemap structure
-        id: validate_sitemap
+
+      - name: Run Sitemap Submission
         run: |
-          if [ ! -f "sitemap.xml" ]; then
-            echo "::error::sitemap.xml not found in repository"
-            echo "missing_sitemap=true" >> $GITHUB_OUTPUT
-            exit 1
-          fi
-          
-          python .github/scripts/submit_sitemap.py --check-only
-          if [ $? -ne 0 ]; then
-            echo "::error::Invalid sitemap structure"
-            echo "invalid_sitemap=true" >> $GITHUB_OUTPUT
-            exit 1
-          fi
-          
-          echo "valid_sitemap=true" >> $GITHUB_OUTPUT
-      
-      - name: Check for broken links
-        id: link_check
-        if: steps.validate_sitemap.outputs.valid_sitemap == 'true'
-        run: |
-          echo "Checking for broken links in sitemap..."
-          python .github/scripts/submit_sitemap.py --validate-links --verbose
-          
-          if [ -f "broken_links.txt" ]; then
-            echo "broken_links=true" >> $GITHUB_OUTPUT
-            cat broken_links.txt
-          else
-            echo "broken_links=false" >> $GITHUB_OUTPUT
-          fi
-        continue-on-error: true
-      
-      - name: Validate Google credentials
-        id: validate_creds
-        run: |
-          if [ -z "${{ secrets.GOOGLE_API_CREDENTIALS }}" ]; then
-            echo "::warning::GOOGLE_API_CREDENTIALS secret is not configured. Please add it to your repository secrets."
-            echo "credentials_valid=false" >> $GITHUB_OUTPUT
-          else
-            echo "credentials_valid=true" >> $GITHUB_OUTPUT
-            echo "${{ secrets.GOOGLE_API_CREDENTIALS }}" > client_secret.json
-            echo "Google credentials written to file"
-          fi
-      
-      - name: Create GitHub issue for broken links
-        if: steps.link_check.outputs.broken_links == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            try {
-              if (fs.existsSync('broken_links.txt')) {
-                const brokenLinks = fs.readFileSync('broken_links.txt', 'utf8');
-                
-                const issueTitle = '🚨 Broken links detected in sitemap';
-                const issueBody = `## Broken Links Report
-                
-                The sitemap indexing workflow has detected broken links in your sitemap.xml file.
-                
-                ### Details
-                \`\`\`
-                ${brokenLinks}
-                \`\`\`
-                
-                Please fix these links before they are submitted to Google Search Console.
-                If you want to force submission anyway, you can manually trigger the workflow with the "Force submission" option selected.`;
-                
-                github.rest.issues.create({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  title: issueTitle,
-                  body: issueBody,
-                  labels: ['bug', 'sitemap']
-                });
-              }
-            } catch (error) {
-              console.error(`Error creating issue: ${error}`);
-            }
-      
-      - name: Submit sitemap to Google Search Console
-        id: submit_sitemap
-        if: |
-          (steps.link_check.outputs.broken_links == 'false' || github.event.inputs.force_submit == 'true') && 
-          steps.validate_creds.outputs.credentials_valid == 'true'
-        run: |
-          echo "Submitting sitemap to Google Search Console..."
-          
-          # Add force flag if requested
-          FORCE_FLAG=""
-          if [ "${{ github.event.inputs.force_submit }}" == "true" ]; then
-            FORCE_FLAG="--force"
-            echo "Force submission enabled"
-          fi
-          
-          python .github/scripts/submit_sitemap.py --credentials client_secret.json --verbose $FORCE_FLAG
-          
-          if [ $? -eq 0 ]; then
-            echo "submission_success=true" >> $GITHUB_OUTPUT
-          else
-            echo "submission_success=false" >> $GITHUB_OUTPUT
-          fi
-      
-      - name: Report success
-        if: steps.submit_sitemap.outputs.submission_success == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: '✅ Sitemap successfully submitted to Google',
-              body: `## Sitemap Submission Report
-              
-              The sitemap indexing workflow has successfully:
-              
-              1. Validated ${steps.link_check.outputs.broken_links == 'true' ? '(with broken links, but force submitted)' : 'all links in your sitemap.xml'}
-              2. Submitted the sitemap to Google Search Console on ${new Date().toISOString()}.
-              
-              Google will now crawl your sitemap links according to their priority.`,
-              labels: ['automated', 'sitemap']
-            });
-      
-      - name: Report missing credentials
-        if: steps.validate_creds.outputs.credentials_valid == 'false'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: '⚠️ Google Search Console credentials missing',
-              body: `## Sitemap Submission Failed
-              
-              The sitemap indexing workflow could not submit your sitemap because Google Search Console credentials are missing.
-              
-              ### How to Fix
-              
-              1. Generate service account credentials in Google Cloud Console
-              2. Add those credentials as a repository secret named \`GOOGLE_API_CREDENTIALS\`
-              3. Make sure the service account has access to your property in Google Search Console
-              
-              For detailed instructions, see the [Google Search Console API documentation](https://developers.google.com/webmaster-tools/search-console-api-original/v3/quickstart/quickstart-cli).`,
-              labels: ['bug', 'sitemap', 'configuration']
-            });
+          python .github/scripts/submit_sitemap.py \
+            --sitemap-url "https://sednabcn.github.io/sitemap.xml" \
+            ${{ github.event.inputs.force_submit == 'true' && '--force' || '' }}
