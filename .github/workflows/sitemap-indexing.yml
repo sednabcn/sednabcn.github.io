@@ -54,13 +54,12 @@ jobs:
             ${{ github.event.inputs.check_only == 'true' && '--check-only' || '' }}
 
       - name: Submit URLs to Bing
+        env:
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
+          BING_API_KEY: ${{ secrets.BING_API_KEY }}
         run: |
           python .github/scripts/submit_sitemap_bing.py \
             --sitemap sitemap.xml \
             --site "https://sednabcn.github.io"
-        env:
-          BING_API_KEY: ${{ secrets.BING_API_KEY }}
-	  EMAIL_FROM: ${{ secrets.EMAIL_FROM }}		 
-          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
- 
