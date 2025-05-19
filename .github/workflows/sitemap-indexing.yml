@@ -44,10 +44,10 @@ jobs:
           mkdir -p .github/scripts
           cat > .github/scripts/submit_sitemap.py << 'EOF'
 #!/usr/bin/env python3
-"""
-Enhanced Google Sitemap Submission Tool
-Combines checking and submission functionality into a single script.
-"""
+
+# Enhanced Google Sitemap Submission Tool
+# Combines checking and submission functionality into a single script.
+
 import argparse
 import os
 import sys
