@@ -60,3 +60,7 @@ jobs:
             --site "https://sednabcn.github.io"
         env:
           BING_API_KEY: ${{ secrets.BING_API_KEY }}
+	  EMAIL_FROM: ${{ secrets.EMAIL_FROM }}		 
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
+ 
