@@ -1,48 +1,3 @@
-name: Google Sitemap Indexing
-
-on:
-  # Trigger when sitemap.xml is modified in a push
-  push:
-    paths:
-      - 'sitemap.xml'
-  
-  # Allow manual triggering through GitHub Actions interface
-  workflow_dispatch:
-    inputs:
-      force_submit:
-        description: 'Force submission even if there are broken links'
-        required: false
-        default: 'false'
-        type: choice
-        options:
-          - 'true'
-          - 'false'
-  
-  # Run monthly as a backup validation
-  schedule:
-    - cron: '0 0 1 * *'  # At midnight on the first day of each month
-
-jobs:
-  index-sitemap:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.12'
-      
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests
-
-      - name: Create sitemap submission script
-        run: |
-          mkdir -p .github/scripts
-          cat > .github/scripts/submit_sitemap.py << 'EOF'
 #!/usr/bin/env python3
 """
 Enhanced Google Sitemap Submission Tool
@@ -326,7 +281,6 @@ def main():
     parser.add_argument('--check-only', action='store_true', help='Only check sitemap status without submitting')
     parser.add_argument('--validate-links', action='store_true', help='Validate all URLs in the sitemap')
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose output')
-    parser.add_argument('--force', action='store_true', help='Force submission even if links are broken')
     
     args = parser.parse_args()
     
@@ -356,22 +310,14 @@ def main():
         sys.exit(1)
     
     # Check links if requested
-    broken_links = []
     if args.validate_links:
         broken_links = tool.check_links(urls)
-        if broken_links and not args.force:
+        if broken_links:
             print(f"\n❌ Found {len(broken_links)} broken links:")
             for link in broken_links:
                 print(f"  - {link['url']} (Error: {link['error']})")
             print("\nFix broken links before submitting sitemap to Google.")
-            print("Or use --force to submit anyway.")
-            # Write broken links to file for GitHub Action
-            with open('broken_links.txt', 'w') as f:
-                for link in broken_links:
-                    f.write(f"{link['url']} (Error: {link['error']})\n")
             sys.exit(1)
-        elif broken_links and args.force:
-            print(f"\n⚠️ Found {len(broken_links)} broken links but continuing due to --force flag")
         else:
             print("✅ All links in sitemap are valid")
     
@@ -405,151 +351,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-EOF
-          chmod +x .github/scripts/submit_sitemap.py
-      
-      - name: Validate sitemap structure
-        id: validate_sitemap
-        run: |
-          if [ ! -f "sitemap.xml" ]; then
-            echo "::error::sitemap.xml not found in repository"
-            echo "missing_sitemap=true" >> $GITHUB_OUTPUT
-            exit 1
-          fi
-          
-          python .github/scripts/submit_sitemap.py --check-only
-          if [ $? -ne 0 ]; then
-            echo "::error::Invalid sitemap structure"
-            echo "invalid_sitemap=true" >> $GITHUB_OUTPUT
-            exit 1
-          fi
-          
-          echo "valid_sitemap=true" >> $GITHUB_OUTPUT
-      
-      - name: Check for broken links
-        id: link_check
-        if: steps.validate_sitemap.outputs.valid_sitemap == 'true'
-        run: |
-          echo "Checking for broken links in sitemap..."
-          python .github/scripts/submit_sitemap.py --validate-links --verbose
-          
-          if [ -f "broken_links.txt" ]; then
-            echo "broken_links=true" >> $GITHUB_OUTPUT
-            cat broken_links.txt
-          else
-            echo "broken_links=false" >> $GITHUB_OUTPUT
-          fi
-        continue-on-error: true
-      
-      - name: Validate Google credentials
-        id: validate_creds
-        run: |
-          if [ -z "${{ secrets.GOOGLE_API_CREDENTIALS }}" ]; then
-            echo "::warning::GOOGLE_API_CREDENTIALS secret is not configured. Please add it to your repository secrets."
-            echo "credentials_valid=false" >> $GITHUB_OUTPUT
-          else
-            echo "credentials_valid=true" >> $GITHUB_OUTPUT
-            echo "${{ secrets.GOOGLE_API_CREDENTIALS }}" > client_secret.json
-            echo "Google credentials written to file"
-          fi
-      
-      - name: Create GitHub issue for broken links
-        if: steps.link_check.outputs.broken_links == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            try {
-              if (fs.existsSync('broken_links.txt')) {
-                const brokenLinks = fs.readFileSync('broken_links.txt', 'utf8');
-                
-                const issueTitle = '🚨 Broken links detected in sitemap';
-                const issueBody = `## Broken Links Report
-                
-                The sitemap indexing workflow has detected broken links in your sitemap.xml file.
-                
-                ### Details
-                \`\`\`
-                ${brokenLinks}
-                \`\`\`
-                
-                Please fix these links before they are submitted to Google Search Console.
-                If you want to force submission anyway, you can manually trigger the workflow with the "Force submission" option selected.`;
-                
-                github.rest.issues.create({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  title: issueTitle,
-                  body: issueBody,
-                  labels: ['bug', 'sitemap']
-                });
-              }
-            } catch (error) {
-              console.error(`Error creating issue: ${error}`);
-            }
-      
-      - name: Submit sitemap to Google Search Console
-        id: submit_sitemap
-        if: |
-          (steps.link_check.outputs.broken_links == 'false' || github.event.inputs.force_submit == 'true') && 
-          steps.validate_creds.outputs.credentials_valid == 'true'
-        run: |
-          echo "Submitting sitemap to Google Search Console..."
-          
-          # Add force flag if requested
-          FORCE_FLAG=""
-          if [ "${{ github.event.inputs.force_submit }}" == "true" ]; then
-            FORCE_FLAG="--force"
-            echo "Force submission enabled"
-          fi
-          
-          python .github/scripts/submit_sitemap.py --credentials client_secret.json --verbose $FORCE_FLAG
-          
-          if [ $? -eq 0 ]; then
-            echo "submission_success=true" >> $GITHUB_OUTPUT
-          else
-            echo "submission_success=false" >> $GITHUB_OUTPUT
-          fi
-      
-      - name: Report success
-        if: steps.submit_sitemap.outputs.submission_success == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: '✅ Sitemap successfully submitted to Google',
-              body: `## Sitemap Submission Report
-              
-              The sitemap indexing workflow has successfully:
-              
-              1. Validated ${steps.link_check.outputs.broken_links == 'true' ? '(with broken links, but force submitted)' : 'all links in your sitemap.xml'}
-              2. Submitted the sitemap to Google Search Console on ${new Date().toISOString()}.
-              
-              Google will now crawl your sitemap links according to their priority.`,
-              labels: ['automated', 'sitemap']
-            });
-      
-      - name: Report missing credentials
-        if: steps.validate_creds.outputs.credentials_valid == 'false'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: '⚠️ Google Search Console credentials missing',
-              body: `## Sitemap Submission Failed
-              
-              The sitemap indexing workflow could not submit your sitemap because Google Search Console credentials are missing.
-              
-              ### How to Fix
-              
-              1. Generate service account credentials in Google Cloud Console
-              2. Add those credentials as a repository secret named \`GOOGLE_API_CREDENTIALS\`
-              3. Make sure the service account has access to your property in Google Search Console
-              
-              For detailed instructions, see the [Google Search Console API documentation](https://developers.google.com/webmaster-tools/search-console-api-original/v3/quickstart/quickstart-cli).`,
-              labels: ['bug', 'sitemap', 'configuration']
-            });
