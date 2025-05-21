@@ -1,0 +1,319 @@
+name: Daily Jekyll Deployment Retention (7-Day Window)
+
+on:
+  schedule:
+    - cron: '0 */12 * * *'  # Run every 12 hours
+  workflow_dispatch:  # Manual trigger for testing
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  clean-up:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Keep One Jekyll Deployment Per Day for Last 7 Days
+      run: |
+        echo "⚙️ Starting daily Jekyll retention cleanup at $(date -u)"
+        
+        API_URL="https://api.github.com/repos/$GITHUB_REPOSITORY"
+        TOKEN="${{ secrets.GITHUB_TOKEN }}"
+        
+        # Configuration variables
+        JEKYLL_PATTERN="jekyll|deploy|build|site|pages"  # Pattern to match Jekyll-related workflows
+        RETENTION_DAYS=7                                 # Keep one deployment per day for 7 days
+        
+        echo "📥 Fetching all workflow runs..."
+        PAGE=1
+        RUNS=$(curl -s -H "Authorization: Bearer $TOKEN" "$API_URL/actions/runs?per_page=100&page=$PAGE")
+        
+        if [[ $(echo "$RUNS" | jq -r '.message // empty') ]]; then
+          echo "❌ API Error: $(echo "$RUNS" | jq -r '.message')"
+          exit 1
+        fi
+        
+        # Rest of script continues as before
+        TOTAL_RUNS=$(echo "$RUNS" | jq '.workflow_runs | length')
+        echo "Found $TOTAL_RUNS total workflow runs"
+        
+        # Extract all Jekyll-related workflow runs
+        JEKYLL_RUNS=$(echo "$RUNS" | jq -c --arg PATTERN "$JEKYLL_PATTERN" '
+          .workflow_runs
+          | map(select(.name | test($PATTERN; "i")))
+          | sort_by(.created_at)
+          | reverse
+        ')
+        
+        TOTAL_JEKYLL=$(echo "$JEKYLL_RUNS" | jq 'length')
+        echo "Found $TOTAL_JEKYLL Jekyll-related workflow runs"
+        
+        # Group Jekyll runs by day (using date only, not time)
+        # First, create a mapping from full date to date only
+        echo "📅 Grouping Jekyll deployments by day..."
+        
+        # Create a temporary file for processing
+        TMP_FILE=$(mktemp)
+        
+        # Extract Jekyll runs with simplified date (YYYY-MM-DD only)
+        echo "$JEKYLL_RUNS" | jq -c '.[]' | while read -r run; do
+          RUN_ID=$(echo "$run" | jq -r '.id')
+          FULL_DATE=$(echo "$run" | jq -r '.created_at')
+          DATE_ONLY=${FULL_DATE%T*}  # Extract YYYY-MM-DD part only
+          
+          echo "$RUN_ID,$DATE_ONLY,$FULL_DATE" >> "$TMP_FILE"
+        done
+        
+        # Calculate the date 7 days ago
+        SEVEN_DAYS_AGO=$(date -u -d "-${RETENTION_DAYS} days" +"%Y-%m-%d")
+        
+        echo "🧮 Processing Jekyll runs to keep one per day for last 7 days..."
+        
+        # Create arrays to track runs to keep and delete
+        declare -A DEPLOYMENTS_TO_KEEP
+        RUNS_TO_DELETE=()
+        
+        # Read the file and identify which runs to keep (one per day)
+        while IFS=, read -r run_id date_only full_date; do
+          # Skip if date is older than retention period
+          # Fix the conditional expression syntax
+          if [[ "$date_only" < "$SEVEN_DAYS_AGO" ]]; then
+            echo "📌 Run $run_id from $date_only is beyond 7-day retention window"
+            RUNS_TO_DELETE+=("$run_id")
+            continue
+          fi
+          
+          # If we haven't seen this date yet, keep this run
+          if [[ -z "${DEPLOYMENTS_TO_KEEP[$date_only]}" ]]; then
+            echo "✅ Keeping run $run_id as the deployment for $date_only"
+            DEPLOYMENTS_TO_KEEP[$date_only]=$run_id
+          else
+            # We already have a deployment for this day, delete this one
+            echo "🗑️ Run $run_id is an extra deployment for $date_only"
+            RUNS_TO_DELETE+=("$run_id")
+          fi
+        done < "$TMP_FILE"
+        
+        # Clean up temp file
+        rm "$TMP_FILE"
+        
+        # Count deployments being kept
+        KEPT_COUNT=${#DEPLOYMENTS_TO_KEEP[@]}
+        DELETE_COUNT=${#RUNS_TO_DELETE[@]}
+        
+        echo "📊 Jekyll deployment retention summary: Keeping $KEPT_COUNT (one per day), deleting $DELETE_COUNT"
+        
+        # Log what we're keeping
+        echo "🔍 Deployments being kept (one per day):"
+        for date in "${!DEPLOYMENTS_TO_KEEP[@]}"; do
+          echo "  • $date: Run ID ${DEPLOYMENTS_TO_KEEP[$date]}"
+        done
+        
+        # Delete the unnecessary runs
+        DELETED=0
+        ERRORS=0
+        
+        echo "🗑️ Deleting $DELETE_COUNT unnecessary Jekyll runs..."
+        for run_id in "${RUNS_TO_DELETE[@]}"; do
+          echo "→ Deleting run ID: $run_id"
+          DELETE_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE -H "Authorization: Bearer $TOKEN" "$API_URL/actions/runs/$run_id")
+          
+          if [[ "$DELETE_RESPONSE" -ge 200 && "$DELETE_RESPONSE" -lt 300 ]]; then
+            echo "  ✅ Successfully deleted"
+            DELETED=$((DELETED + 1))
+          else
+            echo "  ❌ Failed to delete (HTTP response: $DELETE_RESPONSE)"
+            ERRORS=$((ERRORS + 1))
+          fi
+          
+          # Add a small delay to prevent rate limiting
+          sleep 0.5
+        done
+        
+        # Process non-Jekyll workflows - keep fewer of these
+        echo "🔍 Processing non-Jekyll workflow runs..."
+        
+        # Extract non-Jekyll workflow runs
+        NON_JEKYLL_RUNS=$(echo "$RUNS" | jq -c --arg PATTERN "$JEKYLL_PATTERN" '
+          .workflow_runs
+          | map(select(.name | test($PATTERN; "i") | not))
+        ')
+        
+        TOTAL_NON_JEKYLL=$(echo "$NON_JEKYLL_RUNS" | jq 'length')
+        echo "Found $TOTAL_NON_JEKYLL non-Jekyll workflow runs"
+        
+        # Group non-Jekyll workflows by name
+        WORKFLOW_NAMES=$(echo "$NON_JEKYLL_RUNS" | jq -r '
+          map(.name)
+          | unique
+          | .[]
+        ')
+        
+        OTHER_DELETED=0
+        OTHER_ERRORS=0
+        OTHER_KEPT=0
+        
+        # For non-Jekyll workflows, keep only the latest 2 of each type
+        echo "$WORKFLOW_NAMES" | while read -r workflow_name; do
+          [[ -z "$workflow_name" ]] && continue
+          
+          echo "→ Processing non-Jekyll workflow: $workflow_name"
+          
+          # Get all runs for this workflow name
+          WORKFLOW_RUNS=$(echo "$NON_JEKYLL_RUNS" | jq -c --arg NAME "$workflow_name" '
+            map(select(.name == $NAME))
+            | sort_by(.created_at)
+            | reverse
+          ')
+          
+          TOTAL_OF_TYPE=$(echo "$WORKFLOW_RUNS" | jq 'length')
+          TO_KEEP=2  # Keep latest 2 of each non-Jekyll workflow
+          TO_DELETE=$(( TOTAL_OF_TYPE - TO_KEEP ))
+          
+          if [[ $TO_DELETE -le 0 ]]; then
+            echo "  ✅ Nothing to delete for this workflow type"
+            OTHER_KEPT=$((OTHER_KEPT + TOTAL_OF_TYPE))
+            continue
+          fi
+          
+          echo "  Found $TOTAL_OF_TYPE runs, keeping latest $TO_KEEP, deleting $TO_DELETE"
+          
+          # Delete runs beyond our keep limit
+          RUNS_TO_DELETE=$(echo "$WORKFLOW_RUNS" | jq -c --arg KEEP "$TO_KEEP" '.[($KEEP | tonumber):]')
+          
+          DELETED=0
+          ERRORS=0
+          
+          echo "$RUNS_TO_DELETE" | jq -c '.[]' | while read -r run; do
+            RUN_ID=$(echo "$run" | jq -r '.id')
+            RUN_CREATED=$(echo "$run" | jq -r '.created_at')
+            
+            echo "  → Deleting run ID: $RUN_ID (Created: $RUN_CREATED)"
+            DELETE_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE -H "Authorization: Bearer $TOKEN" "$API_URL/actions/runs/$RUN_ID")
+            
+            if [[ "$DELETE_RESPONSE" -ge 200 && "$DELETE_RESPONSE" -lt 300 ]]; then
+              echo "    ✅ Successfully deleted"
+              DELETED=$((DELETED + 1))
+            else
+              echo "    ❌ Failed to delete (HTTP response: $DELETE_RESPONSE)"
+              ERRORS=$((ERRORS + 1))
+            fi
+            
+            # Add a small delay to prevent rate limiting
+            sleep 0.5
+          done
+          
+          OTHER_DELETED=$((OTHER_DELETED + DELETED))
+          OTHER_ERRORS=$((OTHER_ERRORS + ERRORS))
+          OTHER_KEPT=$((OTHER_KEPT + TO_KEEP))
+        done
+        
+        # ---------------------------
+        # 2️⃣ Handle artifacts with similar daily retention
+        # ---------------------------
+        echo "🧹 Fetching artifacts..."
+        ARTIFACTS=$(curl -s -H "Authorization: Bearer $TOKEN" "$API_URL/actions/artifacts?per_page=100")
+        
+        if [[ $(echo "$ARTIFACTS" | jq -r '.message // empty') ]]; then
+          echo "❌ API Error when fetching artifacts: $(echo "$ARTIFACTS" | jq -r '.message')"
+          exit 1
+        fi
+        
+        TOTAL_ARTIFACTS=$(echo "$ARTIFACTS" | jq '.artifacts | length')
+        echo "Found $TOTAL_ARTIFACTS total artifacts"
+        
+        # Keep artifacts related to the workflow runs we're keeping
+        KEEP_ARTIFACTS=()
+        
+        # Add latest artifact regardless
+        LATEST_ARTIFACT_ID=$(echo "$ARTIFACTS" | jq -r '.artifacts | sort_by(.created_at) | reverse | .[0].id // "none"')
+        if [[ "$LATEST_ARTIFACT_ID" != "none" ]]; then
+          KEEP_ARTIFACTS+=("$LATEST_ARTIFACT_ID")
+        fi
+        
+        # Add one artifact per day matching our retention pattern
+        echo "Processing artifacts to match daily retention pattern..."
+        
+        # Create a temporary file for processing
+        TMP_FILE=$(mktemp)
+        
+        # Filter Jekyll artifacts and group by day
+        echo "$ARTIFACTS" | jq -c --arg PATTERN "$JEKYLL_PATTERN" '.artifacts[] | select(.name | test($PATTERN; "i"))' | while read -r artifact; do
+          ARTIFACT_ID=$(echo "$artifact" | jq -r '.id')
+          FULL_DATE=$(echo "$artifact" | jq -r '.created_at')
+          DATE_ONLY=${FULL_DATE%T*}  # Extract YYYY-MM-DD part only
+          
+          echo "$ARTIFACT_ID,$DATE_ONLY,$FULL_DATE" >> "$TMP_FILE"
+        done
+        
+        # Process artifacts to keep one per day
+        declare -A ARTIFACTS_TO_KEEP
+        while IFS=, read -r artifact_id date_only full_date; do
+          # Skip if date is older than retention period
+          if [[ "$date_only" < "$SEVEN_DAYS_AGO" ]]; then
+            continue
+          fi
+          
+          # If we haven't seen this date yet, keep this artifact
+          if [[ -z "${ARTIFACTS_TO_KEEP[$date_only]}" ]]; then
+            echo "✅ Keeping artifact $artifact_id for $date_only"
+            ARTIFACTS_TO_KEEP[$date_only]=$artifact_id
+            KEEP_ARTIFACTS+=("$artifact_id")
+          fi
+        done < "$TMP_FILE"
+        
+        # Clean up temp file
+        rm "$TMP_FILE"
+        
+        # Delete artifacts we're not keeping
+        ARTIFACT_DELETED=0
+        ARTIFACT_ERROR=0
+        
+        echo "$ARTIFACTS" | jq -c '.artifacts[]' | while read -r artifact; do
+          ARTIFACT_ID=$(echo "$artifact" | jq -r '.id')
+          ARTIFACT_NAME=$(echo "$artifact" | jq -r '.name')
+          ARTIFACT_CREATED=$(echo "$artifact" | jq -r '.created_at')
+          
+          # Check if this is a Jekyll artifact we want to keep
+          KEEP=false
+          for keep_id in "${KEEP_ARTIFACTS[@]}"; do
+            if [[ "$ARTIFACT_ID" == "$keep_id" ]]; then
+              KEEP=true
+              break
+            fi
+          done
+          
+          # For non-Jekyll artifacts, keep those from the last 3 days
+          if [[ $(echo "$ARTIFACT_NAME" | grep -iE "$JEKYLL_PATTERN") == "" ]]; then
+            THREE_DAYS_AGO=$(date -u -d '-3 days' +"%Y-%m-%dT%H:%M:%SZ")
+            if [[ "$ARTIFACT_CREATED" > "$THREE_DAYS_AGO" ]]; then
+              KEEP=true
+            fi
+          fi
+          
+          if [[ "$KEEP" == "true" ]]; then
+            echo "→ Keeping artifact: $ARTIFACT_NAME ($ARTIFACT_ID)"
+            continue
+          fi
+          
+          echo "→ Deleting artifact ID: $ARTIFACT_ID (Name: $ARTIFACT_NAME, Created: $ARTIFACT_CREATED)"
+          DELETE_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE -H "Authorization: Bearer $TOKEN" "$API_URL/actions/artifacts/$ARTIFACT_ID")
+          
+          if [[ "$DELETE_RESPONSE" -ge 200 && "$DELETE_RESPONSE" -lt 300 ]]; then
+            echo "  ✅ Successfully deleted artifact"
+            ARTIFACT_DELETED=$((ARTIFACT_DELETED + 1))
+          else
+            echo "  ❌ Failed to delete artifact (HTTP response: $DELETE_RESPONSE)"
+            ARTIFACT_ERROR=$((ARTIFACT_ERROR + 1))
+          fi
+          
+          # Add a small delay to prevent rate limiting
+          sleep 0.5
+        done
+        
+        # Final summary
+        echo "📊 Jekyll Deployment Summary: Kept $KEPT_COUNT (one per day for last 7 days), Deleted: $DELETED, Errors: $ERRORS"
+        echo "📊 Other Workflow Summary: Kept: $OTHER_KEPT, Deleted: $OTHER_DELETED, Errors: $OTHER_ERRORS"
+        echo "📊 Artifact Summary: Kept: ${#KEEP_ARTIFACTS[@]} (one per day), Deleted: $ARTIFACT_DELETED, Errors: $ARTIFACT_ERROR"
+        echo "✅ Daily retention cleanup complete at $(date -u)"
