@@ -1,233 +1,40 @@
-# .github/workflows/codeql.yml
-name: "CodeQL Security Analysis"
+# .github/config/codeql-config.yml
+# Optional CodeQL configuration file
+# Only create this file if you need custom analysis settings
 
-on:
-  push:
-    branches: [master, main, develop]
-  pull_request:
-    branches: [master, main, develop]
-  schedule:
-    - cron: '0 5 * * 1'  # Every Monday at 5AM UTC
+name: "Custom CodeQL Config"
 
-jobs:
-  # First job: detect what languages are present in the repository
-  detect-languages:
-    name: Detect Languages
-    runs-on: ubuntu-latest
-    outputs:
-      languages: ${{ steps.detect.outputs.languages }}
-      matrix: ${{ steps.detect.outputs.matrix }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: Detect languages in repository
-        id: detect
-        run: |
-          languages=()
-          
-          # Debug: Show what files we're finding
-          echo "=== Debugging file detection ==="
-          echo "Python files found:"
-          find . -name "*.py" -not -path "./.*" -not -path "*/node_modules/*" -not -path "*/venv/*" -not -path "*/__pycache__/*" -type f | head -10
-          echo "JavaScript files found:"
-          find . \( -name "*.js" -o -name "*.ts" -o -name "*.jsx" -o -name "*.tsx" \) -not -path "./.*" -not -path "*/node_modules/*" -type f | head -10
-          echo "================================="
-          
-          # Check for Python files (more thorough)
-          python_count=$(find . -name "*.py" -not -path "./.*" -not -path "*/node_modules/*" -not -path "*/venv/*" -not -path "*/__pycache__/*" -not -path "*/site-packages/*" -type f | wc -l)
-          if [ "$python_count" -gt 0 ]; then
-            echo "Found $python_count Python files"
-            languages+=("python")
-          else
-            echo "No Python files found"
-          fi
-          
-          # Check for JavaScript/TypeScript files
-          js_count=$(find . \( -name "*.js" -o -name "*.ts" -o -name "*.jsx" -o -name "*.tsx" \) -not -path "./.*" -not -path "*/node_modules/*" -type f | wc -l)
-          if [ "$js_count" -gt 0 ]; then
-            echo "Found $js_count JavaScript/TypeScript files"
-            languages+=("javascript")
-          else
-            echo "No JavaScript/TypeScript files found"
-          fi
-          
-          # Check for Java files
-          java_count=$(find . -name "*.java" -not -path "./.*" -not -path "*/target/*" -type f | wc -l)
-          if [ "$java_count" -gt 0 ]; then
-            echo "Found $java_count Java files"
-            languages+=("java")
-          fi
-          
-          # Check for C/C++ files
-          cpp_count=$(find . \( -name "*.c" -o -name "*.cpp" -o -name "*.cc" -o -name "*.cxx" -o -name "*.h" -o -name "*.hpp" \) -not -path "./.*" -type f | wc -l)
-          if [ "$cpp_count" -gt 0 ]; then
-            echo "Found $cpp_count C/C++ files"
-            languages+=("cpp")
-          fi
-          
-          # Check for C# files
-          csharp_count=$(find . \( -name "*.cs" -o -name "*.csx" \) -not -path "./.*" -not -path "*/bin/*" -not -path "*/obj/*" -type f | wc -l)
-          if [ "$csharp_count" -gt 0 ]; then
-            echo "Found $csharp_count C# files"
-            languages+=("csharp")
-          fi
-          
-          # Check for Go files
-          go_count=$(find . -name "*.go" -not -path "./.*" -not -path "*/vendor/*" -type f | wc -l)
-          if [ "$go_count" -gt 0 ]; then
-            echo "Found $go_count Go files"
-            languages+=("go")
-          fi
-          
-          # Check for Ruby files
-          ruby_count=$(find . \( -name "*.rb" -o -name "*.rbw" \) -not -path "./.*" -type f | wc -l)
-          if [ "$ruby_count" -gt 0 ]; then
-            echo "Found $ruby_count Ruby files"
-            languages+=("ruby")
-          fi
-          
-          # Check for Swift files
-          swift_count=$(find . -name "*.swift" -not -path "./.*" -type f | wc -l)
-          if [ "$swift_count" -gt 0 ]; then
-            echo "Found $swift_count Swift files"
-            languages+=("swift")
-          fi
-          
-          # If no languages detected, provide helpful guidance
-          if [ ${#languages[@]} -eq 0 ]; then
-            echo "INFO: No supported languages detected in this repository"
-            echo "This repository may contain:"
-            echo "- Documentation only (README, markdown files)"
-            echo "- Configuration files only" 
-            echo "- Binary files or assets"
-            echo "- Source code in unsupported languages"
-            echo ""
-            echo "CodeQL supports: .py, .js, .ts, .jsx, .tsx, .java, .c, .cpp, .cs, .go, .rb, .swift"
-            echo ""
-            echo "Skipping CodeQL analysis for this repository."
-            
-            # Create an empty matrix to skip the analyze job
-            echo "languages=" >> $GITHUB_OUTPUT
-            echo "matrix={\"language\":[]}" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          
-          # Convert array to JSON format for matrix
-          printf -v joined '%s,' "${languages[@]}"
-          languages_json="[\"${joined%,}\"]"
-          languages_json=$(echo "$languages_json" | sed 's/","/", "/g')
-          
-          echo "Detected languages: ${languages[*]}"
-          echo "languages=${languages[*]}" >> $GITHUB_OUTPUT
-          echo "matrix={\"language\":$languages_json}" >> $GITHUB_OUTPUT
+# Disable default queries and specify custom ones
+disable-default-queries: false
 
-  # Main analysis job that runs for each detected language
-  analyze:
-    name: CodeQL Analysis
-    runs-on: ubuntu-latest
-    needs: detect-languages
-    if: ${{ needs.detect-languages.outputs.languages != '' }}
-    timeout-minutes: 360
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.detect-languages.outputs.matrix) }}
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: ${{ matrix.language }}
-          config-file: ./.github/config/codeql-config.yml
-      
-      # Language-specific setup steps
-      - name: Setup Python
-        if: matrix.language == 'python'
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-      
-      - name: Setup Node.js
-        if: matrix.language == 'javascript'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-      
-      - name: Setup Java
-        if: matrix.language == 'java'
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '11'
-      
-      - name: Setup Go
-        if: matrix.language == 'go'
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-      
-      # Build steps for compiled languages
-      - name: Build Java project
-        if: matrix.language == 'java'
-        run: |
-          if [ -f "pom.xml" ]; then
-            mvn compile -DskipTests
-          elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
-            ./gradlew build -x test
-          fi
-      
-      - name: Build C/C++ project
-        if: matrix.language == 'cpp'
-        run: |
-          if [ -f "CMakeLists.txt" ]; then
-            mkdir -p build && cd build
-            cmake .. && make
-          elif [ -f "Makefile" ]; then
-            make
-          fi
-      
-      - name: Build C# project
-        if: matrix.language == 'csharp'
-        run: |
-          if find . -name "*.csproj" -o -name "*.sln" | head -1 | grep -q .; then
-            dotnet build --configuration Release
-          fi
-      
-      - name: Build Go project
-        if: matrix.language == 'go'
-        run: |
-          if [ -f "go.mod" ]; then
-            go build ./...
-          fi
-      
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:${{ matrix.language }}"
+# Add custom query packs
+queries:
+  - uses: security-extended
+  - uses: security-and-quality
 
-  # Summary job to report results
-  summary:
-    name: Analysis Summary
-    runs-on: ubuntu-latest
-    needs: [detect-languages, analyze]
-    if: always()
-    steps:
-      - name: Report Summary
-        run: |
-          echo "## CodeQL Analysis Summary" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "${{ needs.detect-languages.outputs.languages }}" = "" ]; then
-            echo "**Status:** ⚠️ Skipped - No supported languages found" >> $GITHUB_STEP_SUMMARY
-            echo "**Repository Type:** Documentation/Configuration only" >> $GITHUB_STEP_SUMMARY
-            echo "**Action:** No CodeQL analysis needed for this repository" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "**Detected Languages:** ${{ needs.detect-languages.outputs.languages }}" >> $GITHUB_STEP_SUMMARY
-            echo "**Analysis Status:** ${{ needs.analyze.result }}" >> $GITHUB_STEP_SUMMARY
-          fi
+# Path filters - include/exclude specific paths
+paths:
+  - "src/**"
+  - "lib/**"
+paths-ignore:
+  - "**/*.test.js"
+  - "**/*.spec.js"
+  - "**/test/**"
+  - "**/tests/**"
+  - "**/node_modules/**"
+  - "**/vendor/**"
+  - "**/__pycache__/**"
+  - "**/venv/**"
+  - "**/env/**"
+
+# Language-specific configurations
+pack:
+  # JavaScript/TypeScript specific packs
+  javascript:
+    - codeql/javascript-queries:AlertSuppression.ql
+    - codeql/javascript-queries:Security/CWE-079
+
+  # Python specific packs  
+  python:
+    - codeql/python-queries:AlertSuppression.ql
+    - codeql/python-queries:Security/CWE-089
