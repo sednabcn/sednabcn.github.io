@@ -699,29 +699,14 @@ Automatically closing this issue.`
       - name: Send Slack/Teams Notification (if configured)
         if: steps.check_results.outputs.overall_status != 'healthy'
         run: |
-          # This step can be customized to send notifications to Slack, Teams, etc.
-          # Example for curl-based webhook notification:
           if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+            echo "Sending Slack notification..."
+            STATUS_MSG="${{ steps.check_results.outputs.status_message }}"
+            ISSUES_COUNT="${{ steps.check_results.outputs.issues_count }}"
+            WORKFLOW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            
             curl -X POST -H 'Content-type: application/json' \
-              --data '{
-                "text": "🗺️ Sitemap Monitor Alert",
-                "attachments": [{
-                  "color": "danger",
-                  "fields": [{
-                    "title": "Status",
-                    "value": "${{ steps.check_results.outputs.status_message }}",
-                    "short": true
-                  }, {
-                    "title": "Issues Found",
-                    "value": "${{ steps.check_results.outputs.issues_count }}",
-                    "short": true
-                  }, {
-                    "title": "Workflow",
-                    "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>",
-                    "short": false
-                  }]
-                }]
-              }' \
+              --data "{\"text\":\"🗺️ Sitemap Monitor Alert\",\"attachments\":[{\"color\":\"danger\",\"fields\":[{\"title\":\"Status\",\"value\":\"$STATUS_MSG\",\"short\":true},{\"title\":\"Issues Found\",\"value\":\"$ISSUES_COUNT\",\"short\":true},{\"title\":\"Workflow\",\"value\":\"<$WORKFLOW_URL|View Run>\",\"short\":false}]}]}" \
               "${{ secrets.SLACK_WEBHOOK_URL }}"
             echo "Slack notification sent"
           else
