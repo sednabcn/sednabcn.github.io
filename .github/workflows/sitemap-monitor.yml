@@ -2,9 +2,9 @@ name: Enhanced Sitemap Monitor & Status Reporter
 
 on:
   push:
-    branches:["main", "master"]
-  pull_requests:
-    branches:["main", "master"]
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
   schedule:
     - cron: '0 12 * * 1' # Run weekly on Mondays at 12:00 UTC
     - cron: '0 6 * * *'  # Daily health check at 6:00 UTC
@@ -699,25 +699,25 @@ Automatically closing this issue.`
           # Example for curl-based webhook notification:
           if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
             curl -X POST -H 'Content-type: application/json' \
-              --data "{
-                \"text\": \"🗺️ Sitemap Monitor Alert\",
-                \"attachments\": [{
-                  \"color\": \"danger\",
-                  \"fields\": [{
-                    \"title\": \"Status\",
-                    \"value\": \"${{ steps.check_results.outputs.status_message }}\",
-                    \"short\": true
+              --data '{
+                "text": "🗺️ Sitemap Monitor Alert",
+                "attachments": [{
+                  "color": "danger",
+                  "fields": [{
+                    "title": "Status",
+                    "value": "${{ steps.check_results.outputs.status_message }}",
+                    "short": true
                   }, {
-                    \"title\": \"Issues Found\",
-                    \"value\": \"${{ steps.check_results.outputs.issues_count }}\",
-                    \"short\": true
+                    "title": "Issues Found",
+                    "value": "${{ steps.check_results.outputs.issues_count }}",
+                    "short": true
                   }, {
-                    \"title\": \"Workflow\",
-                    \"value\": \"<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>\",
-                    \"short\": false
+                    "title": "Workflow",
+                    "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>",
+                    "short": false
                   }]
                 }]
-              }" \
+              }' \
               "${{ secrets.SLACK_WEBHOOK_URL }}"
             echo "Slack notification sent"
           else
