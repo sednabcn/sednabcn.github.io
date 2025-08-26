@@ -1,6 +1,10 @@
 name: Enhanced Sitemap Monitor & Status Reporter
 
 on:
+  push:
+    branches:["main", "master"]
+  pull_requests:
+    branches:["main", "master"]
   schedule:
     - cron: '0 12 * * 1' # Run weekly on Mondays at 12:00 UTC
     - cron: '0 6 * * *'  # Daily health check at 6:00 UTC
@@ -556,7 +560,6 @@ jobs:
             
             const issueBody = `${reportContent}
 
----
 **Workflow Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
 **Triggered by:** ${{ github.event_name }}
 **Issues Found:** ${issuesCount}
@@ -680,8 +683,8 @@ Automatically closing this issue.`
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "${{ steps.check_results.outputs.status_emoji }} **Status:** ${{ steps.check_results.outputs.status_message }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Issues Found:** ${{ steps.check_results.outputs.issues_found || 0 }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Fixes Applied:** ${{ steps.check_results.outputs.fixes_applied || 0 }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Issues Found:** ${{ steps.check_results.outputs.issues_count || 0 }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Fixes Applied:** ${{ steps.check_results.outputs.fixes_count || 0 }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ -f "sitemap-report.md" ]; then
