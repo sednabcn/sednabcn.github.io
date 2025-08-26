@@ -1043,54 +1043,10 @@ jobs:
             echo "❌ No results file found - Monitoring may have failed"
           fi
           
-          echo "=== END WORKFLOW ===" 
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install google-api-python-client google-auth-oauthlib google-auth-httplib2
-          pip install requests beautifulsoup4 lxml tabulate colorama
-          pip install python-dateutil pytz markdown2 jinja2
-
-      - name: Setup service account credentials
-        run: |
-          echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT }}' > service-account.json
-          chmod 600 service-account.json
-
-      - name: Validate environment and email configuration
-        id: validate_env
-        run: |
-          echo "=== Environment Validation ==="
-          python --version
-          
-          # Validate service account
-          if [ -f "service-account.json" ]; then
-            if python -c "import json; json.load(open('service-account.json'))" 2>/dev/null; then
-              echo "✅ Service account JSON is valid"
-              python -c "
-          import json
-          with open('service-account.json') as f:
-              data = json.load(f)
-              required_fields = ['type', 'project_id', 'private_key_id', 'private_key', 'client_email', 'client_id']
-              missing = [field for field in required_fields if field not in data]
-              if missing:
-                  print(f'❌ Missing required fields: {missing}')
-                  exit(1)
-              else:
-                  print('✅ All required service account fields present')
-          "
-            else
-              echo "❌ Service account JSON is invalid"
-              exit 1
-            fi
->>>>>>> 57a812050eab0dbaec956cf8749863bf3096e4f5
+          echo ""
+          if [ "${{ steps.validate_env.outputs.email_config_valid }}" = "true" ]; then
+            echo "📧 Email configuration: VALID"
+            echo "📧 Recipients: ${{ steps.validate_env.outputs.email_recipients }}"
           else
             echo "📧 Email configuration: INVALID or INCOMPLETE"
           fi
@@ -1098,3 +1054,4 @@ jobs:
           echo ""
           echo "🔗 Workflow run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           echo "=== END SUMMARY ==="
+     
