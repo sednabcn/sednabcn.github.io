@@ -1,4 +1,4 @@
-name: Sitemap Monitor
+name: Daily Sitemap Monitor
 
 on:
   schedule:
