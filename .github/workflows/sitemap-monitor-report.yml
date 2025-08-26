@@ -975,7 +975,8 @@ jobs:
             echo "No results file found"
           fi
           
-          echo "=== END WORKFLOW ===" name: Checkout code
+          echo "=== END WORKFLOW ===" 
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Python
