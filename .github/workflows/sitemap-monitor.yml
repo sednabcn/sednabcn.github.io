@@ -560,7 +560,7 @@ jobs:
 
             const issueBody = `${reportContent}
 
-**Workflow Run:** [#` + '${{ github.run_number }}' + `](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+**Workflow Run:** [#${runNumber}](${serverUrl}/${repository}/actions/runs/${runId})
 **Triggered by:** ${{ github.event_name }}
 **Issues Found:** ${issuesCount}
 **Fixes Applied:** ${fixesCount}
