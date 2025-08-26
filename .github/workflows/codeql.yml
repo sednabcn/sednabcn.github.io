@@ -1,4 +1,3 @@
-# .github/workflows/codeql.yml
 name: "CodeQL Security Analysis"
 
 on:
@@ -16,7 +15,6 @@ on:
     - cron: '0 5 * * 1'
 
 jobs:
-  # First job: detect what languages are present in the repository
   detect-languages:
     name: Detect Languages
     runs-on: ubuntu-latest
@@ -40,13 +38,11 @@ jobs:
           find . \( -name "*.js" -o -name "*.ts" -o -name "*.jsx" -o -name "*.tsx" \) -not -path "./.*" -not -path "*/node_modules/*" -type f | head -10
           echo "================================="
           
-          # Check for Python files (more thorough)
+          # Check for Python files
           python_count=$(find . -name "*.py" -not -path "./.*" -not -path "*/node_modules/*" -not -path "*/venv/*" -not -path "*/__pycache__/*" -not -path "*/site-packages/*" -type f | wc -l)
           if [ "$python_count" -gt 0 ]; then
             echo "Found $python_count Python files"
             languages+=("python")
-          else
-            echo "No Python files found"
           fi
           
           # Check for JavaScript/TypeScript files
@@ -54,8 +50,6 @@ jobs:
           if [ "$js_count" -gt 0 ]; then
             echo "Found $js_count JavaScript/TypeScript files"
             languages+=("javascript")
-          else
-            echo "No JavaScript/TypeScript files found"
           fi
           
           # Check for Java files
@@ -100,37 +94,30 @@ jobs:
             languages+=("swift")
           fi
           
-          # If no languages detected, provide helpful guidance
+          # If no languages detected
           if [ ${#languages[@]} -eq 0 ]; then
             echo "INFO: No supported languages detected in this repository"
-            echo "This repository may contain:"
-            echo "- Documentation only (README, markdown files)"
-            echo "- Configuration files only" 
-            echo "- Binary files or assets"
-            echo "- Source code in unsupported languages"
-            echo ""
-            echo "CodeQL supports: .py, .js, .ts, .jsx, .tsx, .java, .c, .cpp, .cs, .go, .rb, .swift"
-            echo ""
-            echo "Skipping CodeQL analysis for this repository."
-            
-            # Create an empty matrix to skip the analyze job
             echo "languages=" >> $GITHUB_OUTPUT
-            echo "matrix={\"language\":[]}" >> $GITHUB_OUTPUT
+            echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
             exit 0
           fi
           
-          # Convert array to JSON format for matrix
-          printf -v joined '%s,' "${languages[@]}"
-          languages_json="[\"${joined%,}\"]"
-          languages_json=$(echo "$languages_json" | sed 's/","/", "/g')
+          # Create matrix with individual language entries
+          matrix_include="["
+          for i in "${!languages[@]}"; do
+            if [ $i -gt 0 ]; then
+              matrix_include+=","
+            fi
+            matrix_include+="{\"language\":\"${languages[$i]}\"}"
+          done
+          matrix_include+="]"
           
           echo "Detected languages: ${languages[*]}"
           echo "languages=${languages[*]}" >> $GITHUB_OUTPUT
-          echo "matrix={\"language\":$languages_json}" >> $GITHUB_OUTPUT
+          echo "matrix={\"include\":$matrix_include}" >> $GITHUB_OUTPUT
 
-  # Main analysis job that runs for each detected language
   analyze:
-    name: CodeQL Analysis
+    name: CodeQL Analysis (${{ matrix.language }})
     runs-on: ubuntu-latest
     needs: detect-languages
     if: ${{ needs.detect-languages.outputs.languages != '' }}
@@ -148,15 +135,14 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
-          # Removed the config-file reference to use default configuration
       
       # Language-specific setup steps
       - name: Setup Python
         if: matrix.language == 'python'
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.x'
       
@@ -175,7 +161,7 @@ jobs:
       
       - name: Setup Go
         if: matrix.language == 'go'
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: '1.21'
       
@@ -217,16 +203,7 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
-          upload: false
-          output: sarif-results
-          
-      - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: sarif-results/${{ matrix.language }}.sarif
-          category: "/language:${{ matrix.language }}-custom"
 
-  # Summary job to report results
   summary:
     name: Analysis Summary
     runs-on: ubuntu-latest
@@ -238,10 +215,17 @@ jobs:
           echo "## CodeQL Analysis Summary" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ needs.detect-languages.outputs.languages }}" = "" ]; then
-            echo "**Status:** ⚠️ Skipped - No supported languages found" >> $GITHUB_STEP_SUMMARY
+            echo "**Status:** Skipped - No supported languages found" >> $GITHUB_STEP_SUMMARY
             echo "**Repository Type:** Documentation/Configuration only" >> $GITHUB_STEP_SUMMARY
-            echo "**Action:** No CodeQL analysis needed for this repository" >> $GITHUB_STEP_SUMMARY
           else
             echo "**Detected Languages:** ${{ needs.detect-languages.outputs.languages }}" >> $GITHUB_STEP_SUMMARY
             echo "**Analysis Status:** ${{ needs.analyze.result }}" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "${{ needs.analyze.result }}" = "success" ]; then
+              echo "**Result:** Analysis completed successfully" >> $GITHUB_STEP_SUMMARY
+            elif [ "${{ needs.analyze.result }}" = "failure" ]; then
+              echo "**Result:** Analysis found security issues - check Security tab" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "**Result:** Analysis status: ${{ needs.analyze.result }}" >> $GITHUB_STEP_SUMMARY
+            fi
           fi
