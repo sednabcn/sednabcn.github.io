@@ -647,16 +647,20 @@ Automatically closing this issue.`
           STATUS_EMOJI="${{ steps.check_results.outputs.status_emoji }}"
           STATUS_MESSAGE="${{ steps.check_results.outputs.status_message }}"
           
-          cat > .github/badges/sitemap-status.json << EOF
+          cat > .github/badges/sitemap-status.json << 'EOF'
           {
             "schemaVersion": 1,
             "label": "sitemap status",
-            "message": "$STATUS_MESSAGE",
-            "color": "${{ steps.check_results.outputs.overall_status == 'healthy' && 'brightgreen' || 'red' }}",
+            "message": "STATUS_PLACEHOLDER",
+            "color": "COLOR_PLACEHOLDER",
             "namedLogo": "google",
             "logoColor": "white"
           }
           EOF
+          
+          # Replace placeholders
+          sed -i "s/STATUS_PLACEHOLDER/$STATUS_MESSAGE/g" .github/badges/sitemap-status.json
+          sed -i "s/COLOR_PLACEHOLDER/${{ steps.check_results.outputs.overall_status == 'healthy' && 'brightgreen' || 'red' }}/g" .github/badges/sitemap-status.json
           
           echo "Created status badge with: $STATUS_EMOJI $STATUS_MESSAGE"
 
