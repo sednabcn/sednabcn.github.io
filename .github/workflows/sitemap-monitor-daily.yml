@@ -31,9 +31,8 @@ jobs:
           from google.oauth2 import service_account
           from googleapiclient.discovery import build
 
-          
-          SITE_URL = "https://sednabcn.github.io/"   # change if needed
-          SITEMAP_URL = "https://sednabcn.github.io/sitemap.xml"
+          SITE_URL = "https://modelphysmat.com/"
+          SITEMAP_URL = "https://modelphysmat.com/sitemap.xml"
 
           CREDS_JSON = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
           if not CREDS_JSON:
@@ -54,14 +53,18 @@ jobs:
               # Get sitemap status
               sitemap_info = service.sitemaps().get(siteUrl=SITE_URL, feedpath=SITEMAP_URL).execute()
 
+              # Cast warnings/errors to int (API may return strings)
+              errors = int(sitemap_info.get("errors", 0))
+              warnings = int(sitemap_info.get("warnings", 0))
+
               # Build report
               report = [
                   "## 📊 Google Sitemap Status",
                   f"- Last Submitted: {sitemap_info.get('lastSubmitted', 'N/A')}",
                   f"- Last Checked: {sitemap_info.get('lastDownloaded', 'N/A')}",
                   f"- Status: {'⏳ Pending' if sitemap_info.get('isPending') else '✅ Processed'}",
-                  f"- Warnings: {sitemap_info.get('warnings', 0)}",
-                  f"- Errors: {sitemap_info.get('errors', 0)}"
+                  f"- Warnings: {warnings}",
+                  f"- Errors: {errors}"
               ]
 
               print("\n".join(report))
@@ -70,7 +73,7 @@ jobs:
 
               # Set status output
               with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-                  if sitemap_info.get("errors", 0) > 0:
+                  if errors > 0:
                       f.write("status=unhealthy\n")
                   else:
                       f.write("status=healthy\n")
