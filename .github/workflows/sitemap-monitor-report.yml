@@ -364,9 +364,17 @@ jobs:
                           return 'submission_failed'
                   
                   elif status['status'] == 'submitted':
-                      # Check for issues
-                      errors = status.get('errors', 0)
-                      warnings = status.get('warnings', 0)
+                      # Check for issues - ensure numeric conversion
+                      try:
+                          errors = int(status.get('errors', 0))
+                      except (ValueError, TypeError):
+                          errors = 0
+                      
+                      try:
+                          warnings = int(status.get('warnings', 0))
+                      except (ValueError, TypeError):
+                          warnings = 0
+                      
                       is_pending = status.get('isPending', False)
                       
                       if errors > 0:
@@ -464,10 +472,10 @@ jobs:
                           if 'lastDownloaded' in sitemap:
                               report.append(f"**Last Downloaded:** {sitemap['lastDownloaded']}")
                           
-                          if 'errors' in sitemap and sitemap['errors'] > 0:
+                          if 'errors' in sitemap and int(str(sitemap['errors']).replace(',', '') or 0) > 0:
                               report.append(f"**Errors:** {sitemap['errors']}")
                           
-                          if 'warnings' in sitemap and sitemap['warnings'] > 0:
+                          if 'warnings' in sitemap and int(str(sitemap['warnings']).replace(',', '') or 0) > 0:
                               report.append(f"**Warnings:** {sitemap['warnings']}")
                           
                           report.append("")
