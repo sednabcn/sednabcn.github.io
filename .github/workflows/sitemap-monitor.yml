@@ -1,0 +1,720 @@
+name: Enhanced Sitemap Monitor & Status Reporter
+
+on:
+  schedule:
+    - cron: '0 12 * * 1' # Run weekly on Mondays at 12:00 UTC
+    - cron: '0 6 * * *'  # Daily health check at 6:00 UTC
+  workflow_dispatch: # Allow manual triggering
+    inputs:
+      force_resubmit:
+        description: 'Force resubmit all sitemaps'
+        required: false
+        default: 'false'
+        type: boolean
+      detailed_report:
+        description: 'Generate detailed status report'
+        required: false
+        default: 'true'
+        type: boolean
+
+jobs:
+  sitemap-status-monitor:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install google-api-python-client google-auth-oauthlib google-auth-httplib2
+          pip install requests beautifulsoup4 lxml tabulate colorama
+          pip install python-dateutil pytz
+
+      - name: Setup service account credentials
+        run: |
+          echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT }}' > service-account.json
+          chmod 600 service-account.json
+
+      - name: Validate environment
+        run: |
+          echo "=== Environment Validation ==="
+          python --version
+          echo "Service account validation:"
+          if [ -f "service-account.json" ]; then
+            if python -c "import json; json.load(open('service-account.json'))" 2>/dev/null; then
+              echo "✅ Service account JSON is valid"
+              python -c "
+import json
+with open('service-account.json') as f:
+    data = json.load(f)
+    required_fields = ['type', 'project_id', 'private_key_id', 'private_key', 'client_email', 'client_id']
+    missing = [field for field in required_fields if field not in data]
+    if missing:
+        print(f'❌ Missing required fields: {missing}')
+        exit(1)
+    else:
+        print('✅ All required service account fields present')
+"
+            else
+              echo "❌ Service account JSON is invalid"
+              exit 1
+            fi
+          else
+            echo "❌ Service account file missing"
+            exit 1
+          fi    
+          
+      - name: Create enhanced sitemap monitoring script
+        run: |
+          cat > enhanced_sitemap_monitor.py << 'EOF'
+          #!/usr/bin/env python3
+          """
+          Enhanced Sitemap Monitor with Status Reporting and Auto-Fix
+          Monitors Google Search Console sitemap status and handles issues automatically
+          """
+          
+          import os
+          import sys
+          import json
+          import time
+          import argparse
+          from datetime import datetime, timezone, timedelta
+          from typing import Dict, List, Optional, Tuple
+          import requests
+          from urllib.parse import urljoin, urlparse
+          from pathlib import Path
+          
+          try:
+              from google.oauth2 import service_account
+              from googleapiclient.discovery import build
+              from googleapiclient.errors import HttpError
+              import xml.etree.ElementTree as ET
+              from bs4 import BeautifulSoup
+              import pytz
+          except ImportError as e:
+              print(f"❌ Missing required dependency: {e}")
+              sys.exit(1)
+          
+          class SitemapMonitor:
+              def __init__(self, service_account_path: str):
+                  self.service_account_path = service_account_path
+                  self.service = None
+                  self.site_url = None
+                  self.results = {
+                      'timestamp': datetime.now(timezone.utc).isoformat(),
+                      'site_url': None,
+                      'sitemaps': [],
+                      'issues_found': [],
+                      'fixes_applied': [],
+                      'summary': {}
+                  }
+          
+              def authenticate(self) -> bool:
+                  """Authenticate with Google Search Console API"""
+                  try:
+                      credentials = service_account.Credentials.from_service_account_file(
+                          self.service_account_path,
+                          scopes=['https://www.googleapis.com/auth/webmasters']
+                      )
+                      self.service = build('webmasters', 'v3', credentials=credentials)
+                      print("✅ Successfully authenticated with Google Search Console")
+                      return True
+                  except Exception as e:
+                      print(f"❌ Authentication failed: {e}")
+                      self.results['issues_found'].append(f"Authentication failed: {e}")
+                      return False
+          
+              def validate_sitemap_url(self, sitemap_url: str) -> Tuple[bool, str]:
+                  """Validate if sitemap URL is accessible and contains valid XML"""
+                  try:
+                      print(f"🔍 Validating sitemap: {sitemap_url}")
+                      response = requests.get(sitemap_url, timeout=30, headers={
+                          'User-Agent': 'Googlebot/2.1 (+http://www.google.com/bot.html)'
+                      })
+                      
+                      if response.status_code != 200:
+                          return False, f"HTTP {response.status_code}: {response.reason}"
+                      
+                      # Check if it's valid XML
+                      try:
+                          root = ET.fromstring(response.content)
+                          # Check if it's a sitemap or sitemap index
+                          if root.tag.endswith('sitemapindex') or root.tag.endswith('urlset'):
+                              url_count = len(root.findall('.//{http://www.sitemaps.org/schemas/sitemap/0.9}url'))
+                              sitemap_count = len(root.findall('.//{http://www.sitemaps.org/schemas/sitemap/0.9}sitemap'))
+                              
+                              if url_count > 0:
+                                  return True, f"Valid sitemap with {url_count} URLs"
+                              elif sitemap_count > 0:
+                                  return True, f"Valid sitemap index with {sitemap_count} sitemaps"
+                              else:
+                                  return False, "Sitemap contains no URLs or sub-sitemaps"
+                          else:
+                              return False, "Not a valid sitemap XML format"
+                      except ET.ParseError as e:
+                          return False, f"XML parsing error: {e}"
+                          
+                  except requests.RequestException as e:
+                      return False, f"Request failed: {e}"
+          
+              def get_sitemap_status(self, site_url: str, sitemap_url: str) -> Dict:
+                  """Get sitemap status from Google Search Console"""
+                  try:
+                      print(f"📊 Checking sitemap status: {sitemap_url}")
+                      result = self.service.sitemaps().get(
+                          siteUrl=site_url,
+                          feedpath=sitemap_url
+                      ).execute()
+                      
+                      return {
+                          'url': sitemap_url,
+                          'status': 'submitted',
+                          'type': result.get('type', 'unknown'),
+                          'isPending': result.get('isPending', False),
+                          'isSitemapsIndex': result.get('isSitemapsIndex', False),
+                          'submitted': result.get('submitted'),
+                          'lastSubmitted': result.get('lastSubmitted'),
+                          'lastDownloaded': result.get('lastDownloaded'),
+                          'warnings': result.get('warnings', 0),
+                          'errors': result.get('errors', 0),
+                          'contents': result.get('contents', [])
+                      }
+                  except HttpError as e:
+                      if e.resp.status == 404:
+                          return {
+                              'url': sitemap_url,
+                              'status': 'not_submitted',
+                              'error': 'Sitemap not found in Search Console'
+                          }
+                      else:
+                          return {
+                              'url': sitemap_url,
+                              'status': 'error',
+                              'error': f"API error: {e}"
+                          }
+          
+              def submit_sitemap(self, site_url: str, sitemap_url: str) -> bool:
+                  """Submit sitemap to Google Search Console"""
+                  try:
+                      print(f"📤 Submitting sitemap: {sitemap_url}")
+                      self.service.sitemaps().submit(
+                          siteUrl=site_url,
+                          feedpath=sitemap_url
+                      ).execute()
+                      print(f"✅ Successfully submitted sitemap: {sitemap_url}")
+                      self.results['fixes_applied'].append(f"Submitted sitemap: {sitemap_url}")
+                      return True
+                  except HttpError as e:
+                      error_msg = f"Failed to submit sitemap {sitemap_url}: {e}"
+                      print(f"❌ {error_msg}")
+                      self.results['issues_found'].append(error_msg)
+                      return False
+          
+              def delete_sitemap(self, site_url: str, sitemap_url: str) -> bool:
+                  """Delete sitemap from Google Search Console"""
+                  try:
+                      print(f"🗑️ Deleting sitemap: {sitemap_url}")
+                      self.service.sitemaps().delete(
+                          siteUrl=site_url,
+                          feedpath=sitemap_url
+                      ).execute()
+                      print(f"✅ Successfully deleted sitemap: {sitemap_url}")
+                      self.results['fixes_applied'].append(f"Deleted invalid sitemap: {sitemap_url}")
+                      return True
+                  except HttpError as e:
+                      error_msg = f"Failed to delete sitemap {sitemap_url}: {e}"
+                      print(f"❌ {error_msg}")
+                      self.results['issues_found'].append(error_msg)
+                      return False
+          
+              def monitor_sitemaps(self, site_url: str, sitemap_urls: List[str], force_resubmit: bool = False) -> Dict:
+                  """Monitor and fix sitemap issues"""
+                  self.site_url = site_url
+                  self.results['site_url'] = site_url
+                  
+                  if not self.authenticate():
+                      return self.results
+                  
+                  print(f"\n🌐 Monitoring site: {site_url}")
+                  print(f"📋 Checking {len(sitemap_urls)} sitemap(s)")
+                  
+                  for sitemap_url in sitemap_urls:
+                      print(f"\n{'='*60}")
+                      print(f"Processing: {sitemap_url}")
+                      
+                      # Validate sitemap accessibility
+                      is_valid, validation_msg = self.validate_sitemap_url(sitemap_url)
+                      
+                      sitemap_result = {
+                          'url': sitemap_url,
+                          'validation': {
+                              'is_valid': is_valid,
+                              'message': validation_msg
+                          }
+                      }
+                      
+                      if not is_valid:
+                          error_msg = f"Sitemap validation failed for {sitemap_url}: {validation_msg}"
+                          print(f"❌ {error_msg}")
+                          self.results['issues_found'].append(error_msg)
+                          sitemap_result['status'] = 'validation_failed'
+                          sitemap_result['action'] = 'none - invalid sitemap'
+                      else:
+                          print(f"✅ Sitemap validation passed: {validation_msg}")
+                          
+                          # Get current status from Search Console
+                          gsc_status = self.get_sitemap_status(site_url, sitemap_url)
+                          sitemap_result.update(gsc_status)
+                          
+                          # Determine action needed
+                          action_taken = self.determine_and_execute_action(
+                              site_url, sitemap_url, gsc_status, force_resubmit
+                          )
+                          sitemap_result['action'] = action_taken
+                      
+                      self.results['sitemaps'].append(sitemap_result)
+                  
+                  # Generate summary
+                  self.generate_summary()
+                  return self.results
+          
+              def determine_and_execute_action(self, site_url: str, sitemap_url: str, 
+                                             status: Dict, force_resubmit: bool) -> str:
+                  """Determine what action to take and execute it"""
+                  
+                  if status['status'] == 'error':
+                      return f"error - {status.get('error', 'unknown error')}"
+                  
+                  elif status['status'] == 'not_submitted' or force_resubmit:
+                      if self.submit_sitemap(site_url, sitemap_url):
+                          return 'submitted'
+                      else:
+                          return 'submission_failed'
+                  
+                  elif status['status'] == 'submitted':
+                      # Check for issues
+                      errors = status.get('errors', 0)
+                      warnings = status.get('warnings', 0)
+                      is_pending = status.get('isPending', False)
+                      
+                      if errors > 0:
+                          error_msg = f"Sitemap {sitemap_url} has {errors} errors"
+                          print(f"⚠️ {error_msg}")
+                          self.results['issues_found'].append(error_msg)
+                          
+                          # Resubmit to try to fix errors
+                          if self.submit_sitemap(site_url, sitemap_url):
+                              return f're-submitted (had {errors} errors)'
+                          else:
+                              return f'resubmission_failed ({errors} errors)'
+                      
+                      elif warnings > 0:
+                          warning_msg = f"Sitemap {sitemap_url} has {warnings} warnings"
+                          print(f"⚠️ {warning_msg}")
+                          self.results['issues_found'].append(warning_msg)
+                          return f'ok_with_warnings ({warnings} warnings)'
+                      
+                      elif is_pending:
+                          print(f"⏳ Sitemap {sitemap_url} is pending processing")
+                          return 'pending_processing'
+                      
+                      else:
+                          print(f"✅ Sitemap {sitemap_url} is healthy")
+                          return 'healthy'
+                  
+                  return 'unknown_status'
+          
+              def generate_summary(self):
+                  """Generate summary statistics"""
+                  total_sitemaps = len(self.results['sitemaps'])
+                  healthy_count = sum(1 for s in self.results['sitemaps'] 
+                                    if s.get('action') == 'healthy')
+                  error_count = len(self.results['issues_found'])
+                  fixes_count = len(self.results['fixes_applied'])
+                  
+                  self.results['summary'] = {
+                      'total_sitemaps': total_sitemaps,
+                      'healthy_sitemaps': healthy_count,
+                      'issues_found': error_count,
+                      'fixes_applied': fixes_count,
+                      'overall_status': 'healthy' if error_count == 0 else 'issues_detected'
+                  }
+          
+              def generate_report(self, detailed: bool = True) -> str:
+                  """Generate human-readable report"""
+                  summary = self.results['summary']
+                  report = []
+                  
+                  report.append("# 🗺️ Sitemap Monitor Report")
+                  report.append(f"**Generated:** {self.results['timestamp']}")
+                  report.append(f"**Site:** {self.results['site_url']}")
+                  report.append("")
+                  
+                  # Status badge
+                  if summary['overall_status'] == 'healthy':
+                      report.append("## 🟢 Overall Status: HEALTHY")
+                  else:
+                      report.append("## 🔴 Overall Status: ISSUES DETECTED")
+                  
+                  report.append("")
+                  
+                  # Summary stats
+                  report.append("## 📊 Summary")
+                  report.append(f"- **Total Sitemaps:** {summary['total_sitemaps']}")
+                  report.append(f"- **Healthy Sitemaps:** {summary['healthy_sitemaps']}")
+                  report.append(f"- **Issues Found:** {summary['issues_found']}")
+                  report.append(f"- **Fixes Applied:** {summary['fixes_applied']}")
+                  report.append("")
+                  
+                  if detailed:
+                      # Detailed sitemap status
+                      report.append("## 📋 Detailed Sitemap Status")
+                      for sitemap in self.results['sitemaps']:
+                          url = sitemap['url']
+                          action = sitemap.get('action', 'unknown')
+                          
+                          if action == 'healthy':
+                              status_emoji = "✅"
+                          elif 'error' in action.lower() or 'failed' in action.lower():
+                              status_emoji = "❌"
+                          elif 'warning' in action.lower():
+                              status_emoji = "⚠️"
+                          else:
+                              status_emoji = "ℹ️"
+                          
+                          report.append(f"### {status_emoji} {url}")
+                          report.append(f"**Action:** {action}")
+                          
+                          if 'validation' in sitemap:
+                              val = sitemap['validation']
+                              report.append(f"**Validation:** {'✅ Valid' if val['is_valid'] else '❌ Invalid'} - {val['message']}")
+                          
+                          if 'lastDownloaded' in sitemap:
+                              report.append(f"**Last Downloaded:** {sitemap['lastDownloaded']}")
+                          
+                          if 'errors' in sitemap and sitemap['errors'] > 0:
+                              report.append(f"**Errors:** {sitemap['errors']}")
+                          
+                          if 'warnings' in sitemap and sitemap['warnings'] > 0:
+                              report.append(f"**Warnings:** {sitemap['warnings']}")
+                          
+                          report.append("")
+                  
+                  # Issues section
+                  if self.results['issues_found']:
+                      report.append("## ❌ Issues Found")
+                      for issue in self.results['issues_found']:
+                          report.append(f"- {issue}")
+                      report.append("")
+                  
+                  # Fixes section
+                  if self.results['fixes_applied']:
+                      report.append("## ✅ Fixes Applied")
+                      for fix in self.results['fixes_applied']:
+                          report.append(f"- {fix}")
+                      report.append("")
+                  
+                  # Recommendations
+                  if self.results['issues_found']:
+                      report.append("## 💡 Recommendations")
+                      report.append("1. Monitor the issues listed above")
+                      report.append("2. Check your sitemap XML files for validity")
+                      report.append("3. Ensure all URLs in sitemaps are accessible")
+                      report.append("4. Review Google Search Console for additional details")
+                      report.append("")
+                  
+                  return "\n".join(report)
+          
+          def main():
+              parser = argparse.ArgumentParser(description='Enhanced Sitemap Monitor')
+              parser.add_argument('--site', required=True, help='Site URL (e.g., https://example.com/)')
+              parser.add_argument('--sitemaps', required=True, nargs='+', help='Sitemap URLs to monitor')
+              parser.add_argument('--force-resubmit', action='store_true', help='Force resubmit all sitemaps')
+              parser.add_argument('--detailed-report', action='store_true', default=True, help='Generate detailed report')
+              parser.add_argument('--service-account', default='service-account.json', help='Service account JSON file')
+              parser.add_argument('--output-json', help='Output results to JSON file')
+              parser.add_argument('--output-report', help='Output report to markdown file')
+              
+              args = parser.parse_args()
+              
+              print("🚀 Enhanced Sitemap Monitor Starting...")
+              print(f"⏰ Timestamp: {datetime.now(timezone.utc).isoformat()}")
+              
+              monitor = SitemapMonitor(args.service_account)
+              results = monitor.monitor_sitemaps(args.site, args.sitemaps, args.force_resubmit)
+              
+              # Output JSON results
+              if args.output_json:
+                  with open(args.output_json, 'w') as f:
+                      json.dump(results, f, indent=2)
+                  print(f"📄 Results saved to: {args.output_json}")
+              
+              # Generate and output report
+              report = monitor.generate_report(args.detailed_report)
+              print("\n" + "="*80)
+              print(report)
+              
+              if args.output_report:
+                  with open(args.output_report, 'w') as f:
+                      f.write(report)
+                  print(f"📄 Report saved to: {args.output_report}")
+              
+              # Set exit code based on results
+              if results['summary']['overall_status'] != 'healthy':
+                  print(f"\n❌ Exiting with error code 1 - Issues detected")
+                  sys.exit(1)
+              else:
+                  print(f"\n✅ All sitemaps healthy - Exiting with code 0")
+                  sys.exit(0)
+          
+          if __name__ == '__main__':
+              main()
+          EOF
+
+      - name: Run Enhanced Sitemap Monitor
+        id: sitemap_check
+        run: |
+          python enhanced_sitemap_monitor.py \
+            --site "https://sednabcn.github.io/" \
+            --sitemaps "https://sednabcn.github.io/sitemap.xml" \
+            --output-json "sitemap-results.json" \
+            --output-report "sitemap-report.md" \
+            ${{ inputs.force_resubmit == 'true' && '--force-resubmit' || '' }} \
+            ${{ inputs.detailed_report == 'false' && '--no-detailed-report' || '--detailed-report' }}
+        continue-on-error: true
+
+      - name: Upload Results as Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: sitemap-monitor-results-${{ github.run_number }}
+          path: |
+            sitemap-results.json
+            sitemap-report.md
+          retention-days: 30
+
+      - name: Check Results and Set Status
+        id: check_results
+        run: |
+          if [ -f "sitemap-results.json" ]; then
+            # Extract summary from JSON
+            ISSUES_COUNT=$(python -c "import json; data=json.load(open('sitemap-results.json')); print(data['summary']['issues_found'])")
+            FIXES_COUNT=$(python -c "import json; data=json.load(open('sitemap-results.json')); print(data['summary']['fixes_applied'])")
+            OVERALL_STATUS=$(python -c "import json; data=json.load(open('sitemap-results.json')); print(data['summary']['overall_status'])")
+            
+            echo "issues_count=$ISSUES_COUNT" >> $GITHUB_OUTPUT
+            echo "fixes_count=$FIXES_COUNT" >> $GITHUB_OUTPUT
+            echo "overall_status=$OVERALL_STATUS" >> $GITHUB_OUTPUT
+            
+            if [ "$OVERALL_STATUS" = "healthy" ]; then
+              echo "✅ All sitemaps are healthy!"
+              echo "status_emoji=✅" >> $GITHUB_OUTPUT
+              echo "status_message=All sitemaps healthy" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Issues detected in sitemaps!"
+              echo "status_emoji=❌" >> $GITHUB_OUTPUT
+              echo "status_message=Issues detected - check report" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "❌ Results file not found!"
+            echo "status_emoji=💥" >> $GITHUB_OUTPUT
+            echo "status_message=Monitor script failed" >> $GITHUB_OUTPUT
+            echo "issues_count=1" >> $GITHUB_OUTPUT
+            echo "fixes_count=0" >> $GITHUB_OUTPUT
+            echo "overall_status=error" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create or Update Issue on Problems
+        if: steps.check_results.outputs.overall_status != 'healthy'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const issueTitle = '🗺️ Sitemap Monitor: Issues Detected';
+            const issuesCount = '${{ steps.check_results.outputs.issues_count }}';
+            const fixesCount = '${{ steps.check_results.outputs.fixes_count }}';
+            
+            let reportContent = '## Summary\nReport generation failed - check workflow logs.';
+            
+            try {
+              reportContent = fs.readFileSync('sitemap-report.md', 'utf8');
+            } catch (error) {
+              console.log('Could not read report file:', error.message);
+            }
+            
+            const issueBody = `${reportContent}
+
+---
+**Workflow Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+**Triggered by:** ${{ github.event_name }}
+**Issues Found:** ${issuesCount}
+**Fixes Applied:** ${fixesCount}
+
+> This issue was automatically created by the Enhanced Sitemap Monitor workflow.`;
+
+            // Check if there's already an open issue
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: ['sitemap-monitor', 'automated']
+            });
+            
+            const existingIssue = issues.data.find(issue => issue.title === issueTitle);
+            
+            if (existingIssue) {
+              // Update existing issue
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: issueBody
+              });
+              console.log(`Updated existing issue #${existingIssue.number}`);
+            } else {
+              // Create new issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: issueTitle,
+                body: issueBody,
+                labels: ['sitemap-monitor', 'automated', 'bug']
+              });
+              console.log('Created new sitemap monitor issue');
+            }
+
+      - name: Close Issue if All Healthy
+        if: steps.check_results.outputs.overall_status == 'healthy'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const issueTitle = '🗺️ Sitemap Monitor: Issues Detected';
+            
+            // Find open sitemap monitor issues
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: ['sitemap-monitor', 'automated']
+            });
+            
+            const existingIssue = issues.data.find(issue => issue.title === issueTitle);
+            
+            if (existingIssue) {
+              // Close the issue with a success comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: `✅ **All sitemap issues have been resolved!**
+
+The latest sitemap monitor run shows all sitemaps are now healthy.
+
+**Workflow Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+**Status:** All sitemaps healthy
+**Fixes Applied:** ${{ steps.check_results.outputs.fixes_count }}
+
+Automatically closing this issue.`
+              });
+              
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                state: 'closed'
+              });
+              console.log(`Closed resolved issue #${existingIssue.number}`);
+            }
+
+      - name: Update Repository Status Badge
+        run: |
+          mkdir -p .github/badges
+          STATUS_EMOJI="${{ steps.check_results.outputs.status_emoji }}"
+          STATUS_MESSAGE="${{ steps.check_results.outputs.status_message }}"
+          
+          cat > .github/badges/sitemap-status.json << EOF
+          {
+            "schemaVersion": 1,
+            "label": "sitemap status",
+            "message": "$STATUS_MESSAGE",
+            "color": "${{ steps.check_results.outputs.overall_status == 'healthy' && 'brightgreen' || 'red' }}",
+            "namedLogo": "google",
+            "logoColor": "white"
+          }
+          EOF
+          
+          echo "Created status badge with: $STATUS_EMOJI $STATUS_MESSAGE"
+
+      - name: Commit Status Updates
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          if [ -f ".github/badges/sitemap-status.json" ]; then
+            git add .github/badges/sitemap-status.json
+          fi
+          
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "🗺️ Update sitemap status badge - ${{ steps.check_results.outputs.status_message }}"
+            git push
+            echo "Committed status updates"
+          fi
+
+      - name: Summary
+        run: |
+          echo "## 🗺️ Sitemap Monitor Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.check_results.outputs.status_emoji }} **Status:** ${{ steps.check_results.outputs.status_message }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Issues Found:** ${{ steps.check_results.outputs.issues_found || 0 }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Fixes Applied:** ${{ steps.check_results.outputs.fixes_applied || 0 }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "sitemap-report.md" ]; then
+            echo "### 📋 Detailed Report" >> $GITHUB_STEP_SUMMARY
+            cat sitemap-report.md >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Send Slack/Teams Notification (if configured)
+        if: steps.check_results.outputs.overall_status != 'healthy'
+        run: |
+          # This step can be customized to send notifications to Slack, Teams, etc.
+          # Example for curl-based webhook notification:
+          if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{
+                \"text\": \"🗺️ Sitemap Monitor Alert\",
+                \"attachments\": [{
+                  \"color\": \"danger\",
+                  \"fields\": [{
+                    \"title\": \"Status\",
+                    \"value\": \"${{ steps.check_results.outputs.status_message }}\",
+                    \"short\": true
+                  }, {
+                    \"title\": \"Issues Found\",
+                    \"value\": \"${{ steps.check_results.outputs.issues_count }}\",
+                    \"short\": true
+                  }, {
+                    \"title\": \"Workflow\",
+                    \"value\": \"<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>\",
+                    \"short\": false
+                  }]
+                }]
+              }" \
+              "${{ secrets.SLACK_WEBHOOK_URL }}"
+            echo "Slack notification sent"
+          else
+            echo "No Slack webhook configured, skipping notification"
+          fi
