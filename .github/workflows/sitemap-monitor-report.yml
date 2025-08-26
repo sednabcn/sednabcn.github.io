@@ -669,17 +669,17 @@ jobs:
                   
                   lines.append("SITEMAP MONITOR REPORT")
                   lines.append("=" * 50)
-                  lines.append(f"Site: {results.get('site_url', 'Unknown')}")
-                  lines.append(f"Generated: {results.get('timestamp', 'Unknown')}")
+
+                  lines.append(f"Generated: {results.get('timestamp', 'N/A')}")
+                  lines.append(f"Site: {results.get('site_url', 'N/A')}")
                   lines.append("")
                   
-                  status = summary.get("overall_status", "unknown")
-                  if status == "healthy":
-                      lines.append("STATUS: ✅ HEALTHY")
+                  if summary.get('overall_status') == 'healthy':
+                      lines.append("Overall Status: HEALTHY ✅")
                   else:
-                      lines.append("STATUS: ⚠️ ISSUES DETECTED")
-                  lines.append("")
+                      lines.append("Overall Status: ISSUES DETECTED ⚠️")
                   
+                  lines.append("")
                   lines.append("SUMMARY")
                   lines.append("-" * 20)
                   lines.append(f"Total Sitemaps: {summary.get('total_sitemaps', 0)}")
@@ -690,114 +690,159 @@ jobs:
                   
                   lines.append("SITEMAP DETAILS")
                   lines.append("-" * 20)
-                  for sitemap in results.get("sitemaps", []):
-                      lines.append(f"URL: {sitemap.get('url', 'Unknown')}")
-                      lines.append(f"Status: {sitemap.get('action', 'Unknown')}")
-                      if sitemap.get("validation"):
-                          val = sitemap["validation"]
-                          lines.append(f"Validation: {'✅ Valid' if val.get('is_valid') else '❌ Invalid'} - {val.get('message', '')}")
+                  for sitemap in results.get('sitemaps', []):
+                      url = sitemap.get('url', 'Unknown')
+                      action = sitemap.get('action', 'unknown')
+                      
+                      if action == 'healthy':
+                          status_symbol = "✅"
+                      elif 'error' in action.lower() or 'failed' in action.lower():
+                          status_symbol = "❌"
+                      elif 'warning' in action.lower():
+                          status_symbol = "⚠️"
+                      else:
+                          status_symbol = "ℹ️"
+                      
+                      lines.append(f"{status_symbol} {url}")
+                      lines.append(f"   Action: {action}")
+                      
+                      if 'validation' in sitemap:
+                          val = sitemap['validation']
+                          val_status = "Valid" if val.get('is_valid') else "Invalid"
+                          lines.append(f"   Validation: {val_status} - {val.get('message', 'N/A')}")
+                      
                       lines.append("")
                   
-                  if results.get("issues_found"):
+                  if results.get('issues_found'):
                       lines.append("ISSUES FOUND")
                       lines.append("-" * 20)
-                      for issue in results["issues_found"]:
+                      for issue in results['issues_found']:
                           lines.append(f"• {issue}")
                       lines.append("")
                   
-                  if results.get("fixes_applied"):
+                  if results.get('fixes_applied'):
                       lines.append("FIXES APPLIED")
                       lines.append("-" * 20)
-                      for fix in results["fixes_applied"]:
+                      for fix in results['fixes_applied']:
                           lines.append(f"• {fix}")
                       lines.append("")
                   
                   return "\n".join(lines)
               
-              def send_email(self, recipients: List[str], results: Dict, 
-                             workflow_url: str = None, include_json: bool = False) -> bool:
+              def send_email(self, recipients: List[str], subject: str, html_content: str, 
+                           text_content: str, attachments: List[str] = None) -> bool:
                   try:
-                      msg = MIMEMultipart("alternative")
+                      msg = MIMEMultipart('alternative')
+                      msg['From'] = self.smtp_config['from_email']
+                      msg['To'] = ', '.join(recipients)
+                      msg['Subject'] = subject
                       
-                      summary = results.get("summary", {})
-                      status = summary.get("overall_status", "unknown")
-                      issues_count = summary.get("issues_found", 0)
+                      # Add text and HTML parts
+                      text_part = MIMEText(text_content, 'plain')
+                      html_part = MIMEText(html_content, 'html')
                       
-                      if status == "healthy":
-                          subject = f"✅ Sitemap Status: All Healthy ({results.get('site_url', 'Site')})"
-                      else:
-                          subject = f"⚠️ Sitemap Alert: {issues_count} Issue(s) Found ({results.get('site_url', 'Site')})"
+                      msg.attach(text_part)
+                      msg.attach(html_part)
                       
-                      msg["Subject"] = subject
-                      msg["From"] = self.smtp_config["from_email"]
-                      msg["To"] = ", ".join(recipients)
-                      
-                      text_content = self.generate_text_report(results)
-                      html_content = self.generate_html_report(results, workflow_url)
-                      
-                      msg.attach(MIMEText(text_content, "plain", "utf-8"))
-                      msg.attach(MIMEText(html_content, "html", "utf-8"))
-                      
-                      if include_json:
-                          json_attachment = MIMEBase("application", "json")
-                          json_attachment.set_payload(json.dumps(results, indent=2))
-                          encoders.encode_base64(json_attachment)
-                          json_attachment.add_header(
-                              "Content-Disposition",
-                              f"attachment; filename=sitemap-results-{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-                          )
-                          msg.attach(json_attachment)
+                      # Add attachments if provided
+                      if attachments:
+                          for file_path in attachments:
+                              if os.path.exists(file_path):
+                                  with open(file_path, 'rb') as attachment:
+                                      part = MIMEBase('application', 'octet-stream')
+                                      part.set_payload(attachment.read())
+                                  
+                                  encoders.encode_base64(part)
+                                  part.add_header(
+                                      'Content-Disposition',
+                                      f'attachment; filename= {os.path.basename(file_path)}'
+                                  )
+                                  msg.attach(part)
                       
                       # Send email
                       context = ssl.create_default_context()
-                      with smtplib.SMTP(self.smtp_config["server"], self.smtp_config["port"]) as server:
+                      
+                      with smtplib.SMTP(self.smtp_config['server'], self.smtp_config['port']) as server:
                           server.starttls(context=context)
-                          server.login(self.smtp_config["username"], self.smtp_config["password"])
+                          server.login(self.smtp_config['username'], self.smtp_config['password'])
                           server.send_message(msg)
                       
-                      print(f"Email sent successfully to: {', '.join(recipients)}")
+                      print(f"✅ Email sent successfully to: {', '.join(recipients)}")
                       return True
                       
                   except Exception as e:
-                      print(f"Failed to send email: {e}")
+                      print(f"❌ Failed to send email: {e}")
                       return False
+              
+              def should_send_email(self, results: Dict, send_on_success: bool = False) -> bool:
+                  summary = results.get('summary', {})
+                  has_issues = summary.get('overall_status') != 'healthy'
+                  
+                  return has_issues or send_on_success
+              
+              def generate_subject(self, results: Dict) -> str:
+                  summary = results.get('summary', {})
+                  site_url = results.get('site_url', 'Unknown Site')
+                  
+                  if summary.get('overall_status') == 'healthy':
+                      return f"✅ Sitemap Monitor: All Healthy - {site_url}"
+                  else:
+                      issues_count = summary.get('issues_found', 0)
+                      fixes_count = summary.get('fixes_applied', 0)
+                      return f"⚠️ Sitemap Monitor: {issues_count} Issues, {fixes_count} Fixes - {site_url}"
 
           def main():
               parser = argparse.ArgumentParser(description='Email Sitemap Reporter')
               parser.add_argument('--results-file', required=True, help='JSON results file from sitemap monitor')
               parser.add_argument('--recipients', required=True, help='Comma-separated email recipients')
-              parser.add_argument('--smtp-server', default='smtp.gmail.com', help='SMTP server')
-              parser.add_argument('--smtp-port', type=int, default=587, help='SMTP port')
+              parser.add_argument('--smtp-server', required=True, help='SMTP server hostname')
+              parser.add_argument('--smtp-port', type=int, default=587, help='SMTP server port')
               parser.add_argument('--smtp-username', required=True, help='SMTP username')
               parser.add_argument('--smtp-password', required=True, help='SMTP password')
               parser.add_argument('--from-email', required=True, help='From email address')
-              parser.add_argument('--workflow-url', help='GitHub workflow URL')
-              parser.add_argument('--include-json', action='store_true', help='Include JSON attachment')
+              parser.add_argument('--send-on-success', action='store_true', help='Send email even when all healthy')
+              parser.add_argument('--workflow-url', help='GitHub workflow run URL')
+              parser.add_argument('--attachments', nargs='*', help='Files to attach to email')
               
               args = parser.parse_args()
               
               smtp_config = {
-                  "server": args.smtp_server,
-                  "port": args.smtp_port,
-                  "username": args.smtp_username,
-                  "password": args.smtp_password,
-                  "from_email": args.from_email
+                  'server': args.smtp_server,
+                  'port': args.smtp_port,
+                  'username': args.smtp_username,
+                  'password': args.smtp_password,
+                  'from_email': args.from_email
               }
               
               try:
                   reporter = EmailSitemapReporter(smtp_config)
                   results = reporter.load_sitemap_results(args.results_file)
+                  
                   recipients = [email.strip() for email in args.recipients.split(',')]
                   
-                  success = reporter.send_email(
-                      recipients=recipients,
-                      results=results,
-                      workflow_url=args.workflow_url,
-                      include_json=args.include_json
-                  )
-                  
-                  sys.exit(0 if success else 1)
-                  
+                  if reporter.should_send_email(results, args.send_on_success):
+                      subject = reporter.generate_subject(results)
+                      html_content = reporter.generate_html_report(results, args.workflow_url)
+                      text_content = reporter.generate_text_report(results)
+                      
+                      success = reporter.send_email(
+                          recipients=recipients,
+                          subject=subject,
+                          html_content=html_content,
+                          text_content=text_content,
+                          attachments=args.attachments or []
+                      )
+                      
+                      if success:
+                          print("Email report sent successfully")
+                          sys.exit(0)
+                      else:
+                          print("Failed to send email report")
+                          sys.exit(1)
+                  else:
+                      print("No email sent - all sitemaps healthy and send_on_success=False")
+                      sys.exit(0)
+                      
               except Exception as e:
                   print(f"Error: {e}")
                   sys.exit(1)
@@ -806,265 +851,206 @@ jobs:
               main()
           EOF
 
-      - name: Run sitemap monitoring
-        id: monitor
+      - name: Run enhanced sitemap monitoring
+        id: sitemap_check
+        continue-on-error: true
         run: |
-          echo "Starting sitemap monitoring..."
+          echo "Running sitemap monitor..."
           
-          # Convert environment variables to arrays
+          # Convert sitemap URLs from environment variable to array
           IFS=',' read -ra SITEMAP_ARRAY <<< "$SITEMAP_URLS"
           
+          # Prepare arguments
+          MONITOR_ARGS="--site \"$SITE_URL\""
+          for sitemap in "${SITEMAP_ARRAY[@]}"; do
+            MONITOR_ARGS="$MONITOR_ARGS --sitemaps \"$sitemap\""
+          done
+          
+          if [ "${{ inputs.force_resubmit }}" = "true" ]; then
+            MONITOR_ARGS="$MONITOR_ARGS --force-resubmit"
+          fi
+          
+          MONITOR_ARGS="$MONITOR_ARGS --detailed-report --output-json sitemap_results.json --output-report sitemap_report.md"
+          
           # Run the monitor
-          python enhanced_sitemap_monitor.py \
-            --site "$SITE_URL" \
-            --sitemaps "${SITEMAP_ARRAY[@]}" \
-            ${{ inputs.force_resubmit == 'true' && '--force-resubmit' || '' }} \
-            ${{ inputs.detailed_report == 'true' && '--detailed-report' || '' }} \
-            --output-json sitemap-results.json \
-            --output-report sitemap-report.md
+          eval "python enhanced_sitemap_monitor.py $MONITOR_ARGS"
+          MONITOR_EXIT_CODE=$?
           
-          # Store exit code for later use
-          echo "monitor_exit_code=$?" >> $GITHUB_OUTPUT
+          echo "monitor_exit_code=$MONITOR_EXIT_CODE" >> $GITHUB_OUTPUT
           
-          # Always continue to next step even if monitor fails
+          # Always continue to email step regardless of monitor results
           exit 0
-
-      - name: Generate workflow URL
-        id: workflow_url
-        run: |
-          WORKFLOW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          echo "workflow_url=$WORKFLOW_URL" >> $GITHUB_OUTPUT
 
       - name: Send email report
         if: steps.validate_env.outputs.email_config_valid == 'true'
         run: |
-          # Check if we should send email
-          SHOULD_SEND_EMAIL=false
+          echo "Preparing to send email report..."
           
-          if [ -f "sitemap-results.json" ]; then
-            # Check if there are issues or if send_email_on_success is true
-            OVERALL_STATUS=$(python -c "
-          import json
-          try:
-              with open('sitemap-results.json') as f:
-                  data = json.load(f)
-                  print(data.get('summary', {}).get('overall_status', 'unknown'))
-          except:
-              print('error')
-          ")
-            
-            if [ "$OVERALL_STATUS" != "healthy" ]; then
-              echo "Sending email due to issues detected"
-              SHOULD_SEND_EMAIL=true
-            elif [ "${{ inputs.send_email_on_success }}" == "true" ]; then
-              echo "Sending email due to send_email_on_success=true"
-              SHOULD_SEND_EMAIL=true
-            else
-              echo "No issues detected and send_email_on_success=false, skipping email"
-            fi
-          else
-            echo "No results file found, sending error email"
-            SHOULD_SEND_EMAIL=true
+          # Determine if we should send email
+          SEND_ON_SUCCESS="${{ inputs.send_email_on_success }}"
+          if [ "$SEND_ON_SUCCESS" != "true" ]; then
+            SEND_ON_SUCCESS="false"
           fi
           
-          if [ "$SHOULD_SEND_EMAIL" == "true" ]; then
-            python email_sitemap_reporter.py \
-              --results-file sitemap-results.json \
-              --recipients "${{ steps.validate_env.outputs.email_recipients }}" \
-              --smtp-server smtp.gmail.com \
-              --smtp-port 587 \
-              --smtp-username "${{ secrets.SMTP_USERNAME }}" \
-              --smtp-password "${{ secrets.SMTP_PASSWORD }}" \
-              --from-email "${{ secrets.SMTP_FROM_EMAIL }}" \
-              --workflow-url "${{ steps.workflow_url.outputs.workflow_url }}" \
-              --include-json
-            
-            if [ $? -eq 0 ]; then
-              echo "Email sent successfully"
-            else
-              echo "Failed to send email"
-            fi
+          # Get workflow run URL
+          WORKFLOW_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          
+          # Prepare email command
+          EMAIL_CMD="python email_sitemap_reporter.py"
+          EMAIL_CMD="$EMAIL_CMD --results-file sitemap_results.json"
+          EMAIL_CMD="$EMAIL_CMD --recipients \"${{ steps.validate_env.outputs.email_recipients }}\""
+          EMAIL_CMD="$EMAIL_CMD --smtp-server \"${{ vars.SMTP_SERVER || 'smtp.gmail.com' }}\""
+          EMAIL_CMD="$EMAIL_CMD --smtp-port ${{ vars.SMTP_PORT || '587' }}"
+          EMAIL_CMD="$EMAIL_CMD --smtp-username \"${{ secrets.SMTP_USERNAME }}\""
+          EMAIL_CMD="$EMAIL_CMD --smtp-password \"${{ secrets.SMTP_PASSWORD }}\""
+          EMAIL_CMD="$EMAIL_CMD --from-email \"${{ secrets.SMTP_FROM_EMAIL }}\""
+          EMAIL_CMD="$EMAIL_CMD --workflow-url \"$WORKFLOW_URL\""
+          
+          if [ "$SEND_ON_SUCCESS" = "true" ]; then
+            EMAIL_CMD="$EMAIL_CMD --send-on-success"
+          fi
+          
+          # Add attachments if they exist
+          ATTACHMENTS=""
+          if [ -f "sitemap_results.json" ]; then
+            ATTACHMENTS="$ATTACHMENTS sitemap_results.json"
+          fi
+          if [ -f "sitemap_report.md" ]; then
+            ATTACHMENTS="$ATTACHMENTS sitemap_report.md"
+          fi
+          
+          if [ -n "$ATTACHMENTS" ]; then
+            EMAIL_CMD="$EMAIL_CMD --attachments $ATTACHMENTS"
+          fi
+          
+          # Send email
+          eval "$EMAIL_CMD"
+          EMAIL_EXIT_CODE=$?
+          
+          if [ $EMAIL_EXIT_CODE -eq 0 ]; then
+            echo "✅ Email report sent successfully"
+          else
+            echo "❌ Failed to send email report (exit code: $EMAIL_EXIT_CODE)"
           fi
 
-      - name: Upload results as artifacts
-        uses: actions/upload-artifact@v4
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
         if: always()
         with:
-          name: sitemap-monitor-results
+          name: sitemap-monitor-results-${{ github.run_id }}
           path: |
-            sitemap-results.json
-            sitemap-report.md
+            sitemap_results.json
+            sitemap_report.md
           retention-days: 30
 
-      - name: Create GitHub issue on failure
-        if: steps.monitor.outputs.monitor_exit_code != '0'
-        uses: actions/github-script@v7
+      - name: Create GitHub issue on persistent failures
+        if: steps.sitemap_check.outputs.monitor_exit_code != '0' && github.event_name == 'schedule'
+        uses: actions/github-script@v6
         with:
           script: |
             const fs = require('fs');
             
-            let reportContent = '';
+            let results = {};
             try {
-              reportContent = fs.readFileSync('sitemap-report.md', 'utf8');
+              const data = fs.readFileSync('sitemap_results.json', 'utf8');
+              results = JSON.parse(data);
             } catch (error) {
-              reportContent = 'Error reading report file: ' + error.message;
+              console.log('Could not read results file:', error);
             }
             
-            const issueTitle = `🚨 Sitemap Monitor Alert - Issues Detected`;
-            const issueBody = `
-            ## Sitemap Monitor Alert
+            const summary = results.summary || {};
+            const issuesCount = summary.issues_found || 0;
+            const fixesCount = summary.fixes_applied || 0;
             
-            The automated sitemap monitoring detected issues that require attention.
+            const title = `Sitemap Monitor: ${issuesCount} Issues Detected`;
+            const body = `
+            # Sitemap Monitor Report
             
-            **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            **Timestamp:** ${new Date().toISOString()}
-            **Trigger:** ${{ github.event_name }}
+            **Status:** Issues Detected ⚠️
+            **Site:** ${results.site_url || process.env.SITE_URL}
+            **Timestamp:** ${results.timestamp || new Date().toISOString()}
+            **Workflow Run:** [View Details](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+            
+            ## Summary
+            - **Total Sitemaps:** ${summary.total_sitemaps || 0}
+            - **Healthy Sitemaps:** ${summary.healthy_sitemaps || 0}
+            - **Issues Found:** ${issuesCount}
+            - **Fixes Applied:** ${fixesCount}
+            
+            ## Issues Found
+            ${results.issues_found ? results.issues_found.map(issue => `- ${issue}`).join('\n') : 'No specific issues listed'}
+            
+            ## Fixes Applied
+            ${results.fixes_applied ? results.fixes_applied.map(fix => `- ${fix}`).join('\n') : 'No fixes applied'}
             
             ---
-            
-            ${reportContent}
-            
-            ---
-            
-            This issue was automatically created by the sitemap monitoring workflow.
+            This issue was automatically created by the Sitemap Monitor workflow.
             `;
             
             // Check if similar issue already exists
-            const existingIssues = await github.rest.issues.listForRepo({
+            const issues = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              labels: 'sitemap-monitor,automated'
+              labels: ['sitemap-monitor', 'automated']
             });
             
-            if (existingIssues.data.length === 0) {
+            const existingIssue = issues.data.find(issue => 
+              issue.title.includes('Sitemap Monitor:') && 
+              issue.created_at > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+            );
+            
+            if (!existingIssue) {
               await github.rest.issues.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                title: issueTitle,
-                body: issueBody,
+                title: title,
+                body: body,
                 labels: ['sitemap-monitor', 'automated', 'bug']
               });
-              console.log('Created new issue for sitemap monitoring failure');
+              console.log('Created new issue for sitemap monitoring failures');
             } else {
-              console.log('Similar issue already exists, skipping issue creation');
+              console.log('Similar issue already exists, skipping creation');
             }
 
       - name: Final status report
         if: always()
         run: |
-          echo "=== SITEMAP MONITOR WORKFLOW COMPLETED ==="
+          echo "=== SITEMAP MONITOR WORKFLOW SUMMARY ==="
           echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-          echo "Monitor Exit Code: ${{ steps.monitor.outputs.monitor_exit_code }}"
-          echo "Email Config Valid: ${{ steps.validate_env.outputs.email_config_valid }}"
-          echo "Email Recipients: ${{ steps.validate_env.outputs.email_recipients }}"
+          echo "Site URL: $SITE_URL"
+          echo "Sitemap URLs: $SITEMAP_URLS"
+          echo ""
           
-          if [ -f "sitemap-results.json" ]; then
-            echo "Results file generated successfully"
+          if [ -f "sitemap_results.json" ]; then
+            echo "✅ Sitemap monitoring completed - Results available"
+            echo "📊 Results summary:"
             python -c "
           import json
-          with open('sitemap-results.json') as f:
-              data = json.load(f)
-              summary = data.get('summary', {})
-              print(f'Overall Status: {summary.get(\"overall_status\", \"unknown\")}')
-              print(f'Total Sitemaps: {summary.get(\"total_sitemaps\", 0)}')
-              print(f'Issues Found: {summary.get(\"issues_found\", 0)}')
-              print(f'Fixes Applied: {summary.get(\"fixes_applied\", 0)}')
+          try:
+              with open('sitemap_results.json') as f:
+                  data = json.load(f)
+                  summary = data.get('summary', {})
+                  print(f'  • Total Sitemaps: {summary.get(\"total_sitemaps\", 0)}')
+                  print(f'  • Healthy Sitemaps: {summary.get(\"healthy_sitemaps\", 0)}')
+                  print(f'  • Issues Found: {summary.get(\"issues_found\", 0)}')
+                  print(f'  • Fixes Applied: {summary.get(\"fixes_applied\", 0)}')
+                  print(f'  • Overall Status: {summary.get(\"overall_status\", \"unknown\").upper()}')
+          except Exception as e:
+              print(f'  • Error reading results: {e}')
           "
           else
-            echo "No results file found"
+            echo "❌ No results file found - Monitoring may have failed"
           fi
           
-          echo "=== END WORKFLOW ===" name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install google-api-python-client google-auth-oauthlib google-auth-httplib2
-          pip install requests beautifulsoup4 lxml tabulate colorama
-          pip install python-dateutil pytz markdown2 jinja2
-
-      - name: Setup service account credentials
-        run: |
-          echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT }}' > service-account.json
-          chmod 600 service-account.json
-
-      - name: Validate environment and email configuration
-        id: validate_env
-        run: |
-          echo "=== Environment Validation ==="
-          python --version
-          
-          # Validate service account
-          if [ -f "service-account.json" ]; then
-            if python -c "import json; json.load(open('service-account.json'))" 2>/dev/null; then
-              echo "✅ Service account JSON is valid"
-              python -c "
-          import json
-          with open('service-account.json') as f:
-              data = json.load(f)
-              required_fields = ['type', 'project_id', 'private_key_id', 'private_key', 'client_email', 'client_id']
-              missing = [field for field in required_fields if field not in data]
-              if missing:
-                  print(f'❌ Missing required fields: {missing}')
-                  exit(1)
-              else:
-                  print('✅ All required service account fields present')
-          "
-            else
-              echo "❌ Service account JSON is invalid"
-              exit 1
-            fi
+          echo ""
+          if [ "${{ steps.validate_env.outputs.email_config_valid }}" = "true" ]; then
+            echo "📧 Email configuration: VALID"
+            echo "📧 Recipients: ${{ steps.validate_env.outputs.email_recipients }}"
           else
-            echo "❌ Service account file missing"
-            exit 1
+            echo "📧 Email configuration: INVALID or INCOMPLETE"
           fi
           
-          # Validate email configuration
-          echo "=== Email Configuration Validation ==="
-          EMAIL_CONFIG_VALID=true
-          
-          if [ -z "${{ secrets.SMTP_USERNAME }}" ]; then
-            echo "❌ SMTP_USERNAME secret not set"
-            EMAIL_CONFIG_VALID=false
-          fi
-          
-          if [ -z "${{ secrets.SMTP_PASSWORD }}" ]; then
-            echo "❌ SMTP_PASSWORD secret not set"
-            EMAIL_CONFIG_VALID=false
-          fi
-          
-          if [ -z "${{ secrets.SMTP_FROM_EMAIL }}" ]; then
-            echo "❌ SMTP_FROM_EMAIL secret not set"
-            EMAIL_CONFIG_VALID=false
-          fi
-          
-          # Determine email recipients
-          RECIPIENTS="${{ inputs.email_recipients }}"
-          if [ -z "$RECIPIENTS" ]; then
-            RECIPIENTS="${{ secrets.DEFAULT_EMAIL_RECIPIENTS }}"
-          fi
-          
-          if [ -z "$RECIPIENTS" ]; then
-            echo "⚠️ No email recipients configured"
-            EMAIL_CONFIG_VALID=false
-          else
-            echo "✅ Email recipients: $RECIPIENTS"
-          fi
-          
-          echo "email_config_valid=$EMAIL_CONFIG_VALID" >> $GITHUB_OUTPUT
-          echo "email_recipients=$RECIPIENTS" >> $GITHUB_OUTPUT
-          
-          if [ "$EMAIL_CONFIG_VALID" = "true" ]; then
-            echo "✅ Email configuration is valid"
-          else
-            echo "⚠️ Email configuration incomplete - reports will be generated but not emailed"
-          fi
-
-     
+          echo ""
+          echo "🔗 Workflow run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "=== END SUMMARY ==="
