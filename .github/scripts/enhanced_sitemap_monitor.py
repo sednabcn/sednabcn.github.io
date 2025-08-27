@@ -67,11 +67,22 @@ class SitemapMonitor:
                 siteUrl=site_url,
                 feedpath=sitemap_url
             ).execute()
+            # Ensure errors and warnings are ints
+            errors = result.get('errors', 0)
+            warnings = result.get('warnings', 0)
+            try:
+                errors = int(errors)
+            except Exception:
+                errors = 0
+            try:
+                warnings = int(warnings)
+            except Exception:
+                warnings = 0
             return {
                 'url': sitemap_url,
                 'status': 'submitted',
-                'errors': result.get('errors', 0),
-                'warnings': result.get('warnings', 0),
+                'errors': errors,
+                'warnings': warnings,
                 'isPending': result.get('isPending', False),
                 'lastDownloaded': result.get('lastDownloaded'),
             }
@@ -104,12 +115,13 @@ class SitemapMonitor:
             else:
                 status = self.get_sitemap_status(site_url, sitemap_url)
                 entry.update(status)
+                errors = int(status.get('errors', 0) or 0)
                 if status['status'] == 'not_submitted' or force_resubmit:
                     if self.submit_sitemap(site_url, sitemap_url):
                         entry['action'] = 'submitted'
-                elif status['status'] == 'submitted' and status['errors'] > 0:
+                elif status['status'] == 'submitted' and errors > 0:
                     self.submit_sitemap(site_url, sitemap_url)
-                    entry['action'] = f're-submitted (errors={status["errors"]})'
+                    entry['action'] = f're-submitted (errors={errors})'
                 else:
                     entry['action'] = 'healthy'
             self.results['sitemaps'].append(entry)
