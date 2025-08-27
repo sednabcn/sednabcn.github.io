@@ -2,9 +2,9 @@ name: Enhanced Sitemap Monitor & Status Reporter
 
 on:
   push:
-    branches: ["main", "master"]
+    branches: [ "main", "master" ]
   pull_request:
-    branches: ["main", "master"]
+    branches: [ "main", "master" ]
   schedule:
     - cron: '0 12 * * 1' # Weekly on Mondays at 12:00 UTC
     - cron: '0 6 * * *'  # Daily health check at 6:00 UTC
@@ -46,8 +46,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install google-api-python-client google-auth-oauthlib google-auth-httplib2
-          pip install requests beautifulsoup4 lxml tabulate colorama
-          pip install python-dateutil pytz
+          pip install requests beautifulsoup4 lxml tabulate colorama python-dateutil pytz
 
       - name: Setup service account credentials
         run: |
@@ -59,19 +58,14 @@ jobs:
           echo "=== Environment Validation ==="
           python --version
           echo "Service account validation:"
-          if python -c "import json; json.load(open('service-account.json'))" 2>/dev/null; then
-            echo "✅ Service account JSON is valid"
-          else
-            echo "❌ Invalid service account JSON"
-            exit 1
-          fi
+          python -c "import json; json.load(open('service-account.json'))" && echo "✅ Service account JSON is valid" || (echo "❌ Invalid service account JSON" && exit 1)
 
       - name: Create enhanced sitemap monitoring script
         run: |
           cat > enhanced_sitemap_monitor.py << 'EOF'
           #!/usr/bin/env python3
-          # (Python code unchanged, see previous version for details.)
-          # ... [Python script omitted for brevity – keep your current version here] ...
+          # (Paste your actual Python script here.)
+          # ...
           EOF
 
       - name: Run Enhanced Sitemap Monitor
@@ -84,29 +78,37 @@ jobs:
           if [ "${FORCE_RESUBMIT}" = "true" ]; then
             FORCE_RESUBMIT_FLAG="--force-resubmit"
           fi
-
           if [ "${DETAILED_REPORT}" = "false" ]; then
             REPORT_FLAG="--no-detailed-report"
           else
             REPORT_FLAG="--detailed-report"
           fi
-
           python enhanced_sitemap_monitor.py \
             --site "$SITE_URL" \
             --sitemaps $SITEMAP_URLS \
             --output-json "sitemap-results.json" \
             --output-report "sitemap-report.md" \
-            $FORCE_RESUBMIT_FLAG \
-            $REPORT_FLAG
+            $FORCE_RESUBMIT_FLAG $REPORT_FLAG
         continue-on-error: true
 
-      - name: Ensure Output Files Exist
+      - name: Ensure Output Files Exist (Fallback)
         run: |
           if [ ! -f "sitemap-results.json" ]; then
             echo '{"summary":{"overall_status":"no_output","issues_found":1,"fixes_applied":0},"sitemaps":[],"issues_found":["No results file created"],"fixes_applied":[]}' > sitemap-results.json
           fi
           if [ ! -f "sitemap-report.md" ]; then
             echo "# Sitemap Monitor Failed\nNo report was generated." > sitemap-report.md
+          fi
+
+      - name: Fail if State Report Not Generated
+        run: |
+          if grep -q "No report was generated." sitemap-report.md; then
+            echo "❌ State Report was not generated! Failing workflow."
+            exit 1
+          fi
+          if grep -q "No results file created" sitemap-results.json; then
+            echo "❌ Results file was not generated! Failing workflow."
+            exit 1
           fi
 
       - name: Upload Results as Artifacts
@@ -121,27 +123,18 @@ jobs:
       - name: Check Results and Set Status
         id: check_results
         run: |
-          if [ -f "sitemap-results.json" ]; then
-            ISSUES_COUNT=$(python -c "import json; d=json.load(open('sitemap-results.json')); print(d['summary']['issues_found'])" 2>/dev/null || echo "1")
-            FIXES_COUNT=$(python -c "import json; d=json.load(open('sitemap-results.json')); print(d['summary']['fixes_applied'])" 2>/dev/null || echo "0")
-            OVERALL_STATUS=$(python -c "import json; d=json.load(open('sitemap-results.json')); print(d['summary']['overall_status'])" 2>/dev/null || echo "error")
-            echo "issues_count=$ISSUES_COUNT" >> $GITHUB_OUTPUT
-            echo "fixes_count=$FIXES_COUNT" >> $GITHUB_OUTPUT
-            echo "overall_status=$OVERALL_STATUS" >> $GITHUB_OUTPUT
-
-            if [ "$OVERALL_STATUS" = "healthy" ]; then
-              echo "status_emoji=✅" >> $GITHUB_OUTPUT
-              echo "status_message=All sitemaps healthy" >> $GITHUB_OUTPUT
-            else
-              echo "status_emoji=❌" >> $GITHUB_OUTPUT
-              echo "status_message=Issues detected - check report" >> $GITHUB_OUTPUT
-            fi
+          ISSUES_COUNT=$(python -c "import json; d=json.load(open('sitemap-results.json')); print(d['summary']['issues_found'])" 2>/dev/null || echo "1")
+          FIXES_COUNT=$(python -c "import json; d=json.load(open('sitemap-results.json')); print(d['summary']['fixes_applied'])" 2>/dev/null || echo "0")
+          OVERALL_STATUS=$(python -c "import json; d=json.load(open('sitemap-results.json')); print(d['summary']['overall_status'])" 2>/dev/null || echo "error")
+          echo "issues_count=$ISSUES_COUNT" >> $GITHUB_OUTPUT
+          echo "fixes_count=$FIXES_COUNT" >> $GITHUB_OUTPUT
+          echo "overall_status=$OVERALL_STATUS" >> $GITHUB_OUTPUT
+          if [ "$OVERALL_STATUS" = "healthy" ]; then
+            echo "status_emoji=✅" >> $GITHUB_OUTPUT
+            echo "status_message=All sitemaps healthy" >> $GITHUB_OUTPUT
           else
-            echo "status_emoji=💥" >> $GITHUB_OUTPUT
-            echo "status_message=Monitor script failed completely" >> $GITHUB_OUTPUT
-            echo "issues_count=1" >> $GITHUB_OUTPUT
-            echo "fixes_count=0" >> $GITHUB_OUTPUT
-            echo "overall_status=error" >> $GITHUB_OUTPUT
+            echo "status_emoji=❌" >> $GITHUB_OUTPUT
+            echo "status_message=Issues detected - check report" >> $GITHUB_OUTPUT
           fi
 
       - name: Create Scripts Directory
@@ -151,14 +144,8 @@ jobs:
         run: |
           cat > scripts/make-issue.js << 'EOF'
           const fs = require('fs');
-
           let reportContent = 'Report generation failed.';
-          try {
-            reportContent = fs.readFileSync('sitemap-report.md', 'utf8');
-          } catch (error) {
-            console.error('Could not read sitemap-report.md:', error.message);
-          }
-
+          try { reportContent = fs.readFileSync('sitemap-report.md', 'utf8'); } catch (e) {}
           const issueBody = `${reportContent}
 
           **Workflow Run:** [#${process.env.GITHUB_RUN_NUMBER}](${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID})
@@ -167,7 +154,6 @@ jobs:
           **Fixes Applied:** ${process.env.FIXES_COUNT}
 
           _Automatically created by the Enhanced Sitemap Monitor workflow._`;
-
           console.log(issueBody);
           EOF
 
@@ -191,14 +177,12 @@ jobs:
             const fs = require('fs');
             const issueTitle = '🗺️ Sitemap Monitor: Issues Detected';
             const issueBody = fs.readFileSync('issue-body.txt', 'utf8');
-
             const issues = await github.rest.issues.listForRepo({
               owner: context.repo.owner, 
               repo: context.repo.repo, 
               state: 'open', 
               labels: ['sitemap-monitor','automated']
             });
-
             const existing = issues.data.find(i => i.title === issueTitle);
             if (existing) {
               await github.rest.issues.update({ 
@@ -229,7 +213,6 @@ jobs:
               state: 'open', 
               labels: ['sitemap-monitor','automated']
             });
-
             const existing = issues.data.find(i => i.title === issueTitle);
             if (existing) {
               await github.rest.issues.createComment({
