@@ -60,13 +60,7 @@ jobs:
           echo "Service account validation:"
           python -c "import json; json.load(open('service-account.json'))" && echo "✅ Service account JSON is valid" || (echo "❌ Invalid service account JSON" && exit 1)
 
-      - name: Create enhanced sitemap monitoring script
-        run: |
-          cat > enhanced_sitemap_monitor.py << 'EOF'
-          #!/usr/bin/env python3
-          # (Paste your actual Python script here.)
-          # ...
-          EOF
+      # No script creation step needed since your script is in scripts/enhanced_sitemap_monitor.py
 
       - name: Run Enhanced Sitemap Monitor
         id: sitemap_check
@@ -83,7 +77,7 @@ jobs:
           else
             REPORT_FLAG="--detailed-report"
           fi
-          python enhanced_sitemap_monitor.py \
+          python ./scripts/enhanced_sitemap_monitor.py \
             --site "$SITE_URL" \
             --sitemaps $SITEMAP_URLS \
             --output-json "sitemap-results.json" \
