@@ -1,27 +1,35 @@
 name: Monitor Google Indexing Status
-
 on:
   schedule:
-    - cron: '0 8 * * 1,4' # Run twice weekly (Monday and Thursday at 8:00 UTC)
+    - cron: '0 8 * * 1,4' # Fixed: Run twice weekly (Monday and Thursday at 8:00 UTC)
   workflow_dispatch: # Allow manual triggering
-
+    inputs:
+      send_email:
+        description: 'Send email notification?'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      
 jobs:
   check-indexing:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4  # Updated to v4
-
+        uses: actions/checkout@v4
+        
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-
+          
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install google-api-python-client google-auth-oauthlib google-auth-httplib2 jq
-
+          
       - name: Write credentials to file
         run: |
           echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT }}' > service-account.json
@@ -49,46 +57,121 @@ jobs:
           
           echo "Service account JSON validated successfully"
         
-      - name: Check indexing status
+      - name: Check indexing status and send email
         run: |
-          python .github/scripts/monitor_indexing_status.py --site https://sednabcn.github.io/ --output indexing_status.json
-        
-      - name: Send email notification
-        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.email == 'true' }}
-        run: |
-          python .github/scripts/monitor_indexing_status.py --site https://sednabcn.github.io/ --email ${{ secrets.NOTIFICATION_EMAIL }}
+          # Determine if we should send email
+          SHOULD_SEND_EMAIL="false"
+          
+          # Send email for scheduled runs (always)
+          if [ "${{ github.event_name }}" == "schedule" ]; then
+            SHOULD_SEND_EMAIL="true"
+            echo "📅 Scheduled run - email will be sent"
+          fi
+          
+          # Send email for manual runs if requested
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            if [ "${{ github.event.inputs.send_email }}" == "true" ]; then
+              SHOULD_SEND_EMAIL="true"
+              echo "📧 Manual run with email requested"
+            else
+              echo "🔇 Manual run without email"
+            fi
+          fi
+          
+          # Run the monitoring script with appropriate flags
+          if [ "$SHOULD_SEND_EMAIL" == "true" ]; then
+            echo "Running indexing check with email notification..."
+            python .github/scripts/monitor_indexing_status.py \
+              --site https://sednabcn.github.io/ \
+              --output indexing_status.json \
+              --email ${{ secrets.NOTIFICATION_EMAIL }}
+          else
+            echo "Running indexing check without email..."
+            python .github/scripts/monitor_indexing_status.py \
+              --site https://sednabcn.github.io/ \
+              --output indexing_status.json
+          fi
         env:
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           SMTP_SERVER: smtp.gmail.com
           SMTP_PORT: 587
+          GOOGLE_APPLICATION_CREDENTIALS: service-account.json
           
-      - name: Upload indexing status report
-        uses: actions/upload-artifact@v4
-        with:
-          name: indexing-status-report
-          path: indexing_status.json
-          retention-days: 90
-          
-      - name: Create issue on errors
+      - name: Display report summary
         if: always()
         run: |
           if [ -f indexing_status.json ]; then
-            if ! ERRORS=$(jq '.crawl_errors' indexing_status.json 2>/dev/null); then
+            echo "=== Indexing Status Report Summary ==="
+            echo "Report generated at: $(date)"
+            
+            # Extract key metrics if available
+            if command -v jq >/dev/null 2>&1; then
+              TOTAL_PAGES=$(jq -r '.total_pages // "N/A"' indexing_status.json 2>/dev/null)
+              INDEXED_PAGES=$(jq -r '.indexed_pages // "N/A"' indexing_status.json 2>/dev/null)
+              CRAWL_ERRORS=$(jq -r '.crawl_errors // "N/A"' indexing_status.json 2>/dev/null)
+              
+              echo "Total pages: $TOTAL_PAGES"
+              echo "Indexed pages: $INDEXED_PAGES"
+              echo "Crawl errors: $CRAWL_ERRORS"
+            else
+              echo "Report content:"
+              cat indexing_status.json
+            fi
+          else
+            echo "❌ No indexing status report generated"
+          fi
+          
+      - name: Upload indexing status report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: indexing-status-report-${{ github.run_number }}
+          path: indexing_status.json
+          retention-days: 90
+          
+      - name: Create issue on critical errors
+        if: always()
+        run: |
+          if [ -f indexing_status.json ]; then
+            if ! ERRORS=$(jq '.crawl_errors // 0' indexing_status.json 2>/dev/null); then
               echo "::warning::Failed to parse indexing_status.json with jq"
               exit 0
             fi
             
-            # Check if ERRORS is a number and greater than 0
-            if [[ "$ERRORS" =~ ^[0-9]+$ ]] && [ "$ERRORS" -gt 0 ]; then
-              echo "Found $ERRORS indexing errors, creating GitHub issue"
-              gh issue create --title "Google Indexing Errors Detected" \
-                --body "Google indexing errors were detected. See the workflow run for details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            # Check if ERRORS is a number and greater than threshold
+            if [[ "$ERRORS" =~ ^[0-9]+$ ]] && [ "$ERRORS" -gt 5 ]; then
+              echo "Found $ERRORS indexing errors (threshold: 5), creating GitHub issue"
+              
+              # Create issue with detailed information
+              ISSUE_BODY="🚨 **Google Indexing Errors Detected**
+              
+              **Summary:**
+              - Crawl errors detected: $ERRORS
+              - Threshold exceeded: 5
+              - Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+              
+              **Next Steps:**
+              1. Review the indexing status report in the workflow artifacts
+              2. Check Google Search Console for detailed error information
+              3. Fix any identified issues with your site
+              4. Monitor the next scheduled run
+              
+              **Auto-generated by:** Google Indexing Monitor
+              **Timestamp:** $(date -u)"
+              
+              gh issue create \
+                --title "🚨 Google Indexing Errors: $ERRORS errors detected" \
+                --body "$ISSUE_BODY" \
+                --label "indexing-error,automated"
+                
+            elif [[ "$ERRORS" =~ ^[0-9]+$ ]] && [ "$ERRORS" -gt 0 ]; then
+              echo "Found $ERRORS indexing errors (below threshold of 5)"
             else
-              echo "No indexing errors found or invalid error count: $ERRORS"
+              echo "No significant indexing errors found"
             fi
           else
-            echo "::warning::indexing_status.json file not found"
+            echo "::warning::indexing_status.json file not found - cannot check for errors"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

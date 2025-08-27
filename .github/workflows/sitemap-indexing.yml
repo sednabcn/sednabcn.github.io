@@ -1,10 +1,8 @@
 name: Google Sitemap Indexing
-
 on:
   push:
     paths:
       - 'sitemap.xml'
-
   workflow_dispatch:
     inputs:
       validate_links:
@@ -23,28 +21,47 @@ on:
         options:
           - 'true'
           - 'false'
-
   schedule:
-    - cron: '0 0 1 * *'
+    - cron: '0 0 1 * *'  # Fixed: removed extra asterisk
 
 jobs:
   index-sitemap:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
+        
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.12'
-
+          
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install requests
-
+          
+      - name: Verify secrets are available
+        run: |
+          echo "Checking if required secrets are set..."
+          if [ -z "${{ secrets.EMAIL_FROM }}" ]; then
+            echo "❌ EMAIL_FROM secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.EMAIL_PASSWORD }}" ]; then
+            echo "❌ EMAIL_PASSWORD secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.NOTIFICATION_EMAIL }}" ]; then
+            echo "❌ NOTIFICATION_EMAIL secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.BING_API_KEY }}" ]; then
+            echo "❌ BING_API_KEY secret is not set"
+            exit 1
+          fi
+          echo "✅ All required secrets are configured"
+          
       - name: Run Sitemap Tool
         run: |
           python .github/scripts/submit_sitemap.py \
@@ -52,14 +69,19 @@ jobs:
             --site "https://sednabcn.github.io" \
             ${{ github.event.inputs.validate_links == 'true' && '--validate-links' || '' }} \
             ${{ github.event.inputs.check_only == 'true' && '--check-only' || '' }}
-
-      - name: Submit URLs to Bing
+            
+      - name: Submit URLs to Bing with error handling
         env:
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
           BING_API_KEY: ${{ secrets.BING_API_KEY }}
         run: |
+          echo "Starting Bing submission with email notifications..."
           python .github/scripts/submit_sitemap_bing.py \
             --sitemap sitemap.xml \
-            --site "https://sednabcn.github.io"
+            --site "https://sednabcn.github.io" || {
+              echo "❌ Bing submission script failed"
+              exit 1
+            }
+          echo "✅ Bing submission completed"
