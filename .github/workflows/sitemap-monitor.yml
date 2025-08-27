@@ -47,7 +47,7 @@ jobs:
 
       - name: Setup service account credentials
         run: |
-          echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT }}' | jq . > service-account.json
+          echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT }}' > service-account.json
           chmod 600 service-account.json
 
       - name: Validate environment
@@ -160,25 +160,29 @@ jobs:
               def monitor_sitemaps(self, site_url: str, sitemap_urls: List[str], force_resubmit: bool = False):
                   self.site_url = site_url
                   self.results['site_url'] = site_url
-                  if not self.authenticate(): return self.results
+                  if not self.authenticate(): 
+                      return self.results
 
                   for sitemap_url in sitemap_urls:
                       valid, msg = self.validate_sitemap_url(sitemap_url)
                       entry = {'url': sitemap_url, 'validation': {'is_valid': valid, 'message': msg}}
+                      
                       if not valid:
                           entry['status'] = 'validation_failed'
                           self.results['issues_found'].append(f"Validation failed {sitemap_url}: {msg}")
                       else:
                           status = self.get_sitemap_status(site_url, sitemap_url)
                           entry.update(status)
+                          
                           if status['status'] == 'not_submitted' or force_resubmit:
                               if self.submit_sitemap(site_url, sitemap_url):
                                   entry['action'] = 'submitted'
-                          elif status['status'] == 'submitted' and status['errors'] > 0:
+                          elif status['status'] == 'submitted' and status.get('errors', 0) > 0:
                               self.submit_sitemap(site_url, sitemap_url)
-                              entry['action'] = f're-submitted (errors={status["errors"]})'
+                              entry['action'] = f"re-submitted (errors={status['errors']})"
                           else:
                               entry['action'] = 'healthy'
+                      
                       self.results['sitemaps'].append(entry)
 
                   self.results['summary'] = {
@@ -196,37 +200,45 @@ jobs:
                   report.append(f"- Total sitemaps: {s['total_sitemaps']}")
                   report.append(f"- Issues found: {s['issues_found']}")
                   report.append(f"- Fixes applied: {s['fixes_applied']}")
+                  
                   if detailed:
                       for sm in self.results['sitemaps']:
                           report.append(f"### {sm['url']}")
-                          report.append(f"Status: {sm.get('status')}")
-                          report.append(f"Action: {sm.get('action')}")
+                          report.append(f"Status: {sm.get('status', 'unknown')}")
+                          report.append(f"Action: {sm.get('action', 'none')}")
+                  
                   return "\n".join(report)
 
           def main():
-              p = argparse.ArgumentParser()
-              p.add_argument('--site', required=True)
-              p.add_argument('--sitemaps', required=True, nargs='+')
-              p.add_argument('--force-resubmit', action='store_true')
-              p.add_argument('--detailed-report', dest='detailed_report', action='store_true')
-              p.add_argument('--no-detailed-report', dest='detailed_report', action='store_false')
-              p.set_defaults(detailed_report=True)
-              p.add_argument('--service-account', default='service-account.json')
-              p.add_argument('--output-json')
-              p.add_argument('--output-report')
-              a = p.parse_args()
+              parser = argparse.ArgumentParser()
+              parser.add_argument('--site', required=True)
+              parser.add_argument('--sitemaps', required=True, nargs='+')
+              parser.add_argument('--force-resubmit', action='store_true')
+              parser.add_argument('--detailed-report', dest='detailed_report', action='store_true')
+              parser.add_argument('--no-detailed-report', dest='detailed_report', action='store_false')
+              parser.set_defaults(detailed_report=True)
+              parser.add_argument('--service-account', default='service-account.json')
+              parser.add_argument('--output-json')
+              parser.add_argument('--output-report')
+              args = parser.parse_args()
 
-              monitor = SitemapMonitor(a.service_account)
-              results = monitor.monitor_sitemaps(a.site, a.sitemaps, a.force_resubmit)
-              if a.output_json:
-                  with open(a.output_json, 'w') as f: json.dump(results, f, indent=2)
-              report = monitor.generate_report(a.detailed_report)
-              if a.output_report:
-                  with open(a.output_report, 'w') as f: f.write(report)
+              monitor = SitemapMonitor(args.service_account)
+              results = monitor.monitor_sitemaps(args.site, args.sitemaps, args.force_resubmit)
+              
+              if args.output_json:
+                  with open(args.output_json, 'w') as f: 
+                      json.dump(results, f, indent=2)
+              
+              report = monitor.generate_report(args.detailed_report)
+              if args.output_report:
+                  with open(args.output_report, 'w') as f: 
+                      f.write(report)
+              
               print(report)
               sys.exit(0 if results['summary']['overall_status'] == 'healthy' else 1)
 
-          if __name__ == "__main__": main()
+          if __name__ == "__main__": 
+              main()
           EOF
 
       - name: Run Enhanced Sitemap Monitor
@@ -260,6 +272,7 @@ jobs:
             echo "issues_count=$ISSUES_COUNT" >> $GITHUB_OUTPUT
             echo "fixes_count=$FIXES_COUNT" >> $GITHUB_OUTPUT
             echo "overall_status=$OVERALL_STATUS" >> $GITHUB_OUTPUT
+            
             if [ "$OVERALL_STATUS" = "healthy" ]; then
               echo "status_emoji=✅" >> $GITHUB_OUTPUT
               echo "status_message=All sitemaps healthy" >> $GITHUB_OUTPUT
@@ -275,6 +288,44 @@ jobs:
             echo "overall_status=error" >> $GITHUB_OUTPUT
           fi
 
+      - name: Create Scripts Directory
+        run: mkdir -p scripts
+
+      - name: Create Issue Body Script
+        run: |
+          cat > scripts/make-issue.js << 'EOF'
+          const fs = require('fs');
+
+          let reportContent = 'Report generation failed.';
+          try {
+            reportContent = fs.readFileSync('sitemap-report.md', 'utf8');
+          } catch (error) {
+            console.error('Could not read sitemap-report.md:', error.message);
+          }
+
+          const issueBody = `${reportContent}
+
+          **Workflow Run:** [#${process.env.GITHUB_RUN_NUMBER}](${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID})
+          **Triggered by:** ${process.env.GITHUB_EVENT_NAME}
+          **Issues Found:** ${process.env.ISSUES_COUNT}
+          **Fixes Applied:** ${process.env.FIXES_COUNT}
+
+          _Automatically created by the Enhanced Sitemap Monitor workflow._`;
+
+          console.log(issueBody);
+          EOF
+
+      - name: Create Issue Body
+        run: node scripts/make-issue.js > issue-body.txt
+        env:
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          ISSUES_COUNT: ${{ steps.check_results.outputs.issues_count }}
+          FIXES_COUNT: ${{ steps.check_results.outputs.fixes_count }}
+
       - name: Create or Update Issue on Problems
         if: steps.check_results.outputs.overall_status != 'healthy'
         uses: actions/github-script@v6
@@ -282,24 +333,31 @@ jobs:
           script: |
             const fs = require('fs');
             const issueTitle = '🗺️ Sitemap Monitor: Issues Detected';
-            let reportContent = 'Report generation failed.';
-            try { reportContent = fs.readFileSync('sitemap-report.md', 'utf8'); } catch {}
-
-            const issueBody = reportContent + '\n\n**Workflow Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})' + 
-'\n**Triggered by:** ${{ github.event_name }}' +
-'\n**Issues Found:** ${{ steps.check_results.outputs.issues_count }}' +
-'\n**Fixes Applied:** ${{ steps.check_results.outputs.fixes_applied }}';
-
-_Automatically created by the Enhanced Sitemap Monitor workflow._`;
+            const issueBody = fs.readFileSync('issue-body.txt', 'utf8');
 
             const issues = await github.rest.issues.listForRepo({
-              owner: context.repo.owner, repo: context.repo.repo, state: 'open', labels: ['sitemap-monitor','automated']
+              owner: context.repo.owner, 
+              repo: context.repo.repo, 
+              state: 'open', 
+              labels: ['sitemap-monitor','automated']
             });
+            
             const existing = issues.data.find(i => i.title === issueTitle);
             if (existing) {
-              await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number, body: issueBody });
+              await github.rest.issues.update({ 
+                owner: context.repo.owner, 
+                repo: context.repo.repo, 
+                issue_number: existing.number, 
+                body: issueBody 
+              });
             } else {
-              await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title: issueTitle, body: issueBody, labels: ['sitemap-monitor','automated','bug'] });
+              await github.rest.issues.create({ 
+                owner: context.repo.owner, 
+                repo: context.repo.repo, 
+                title: issueTitle, 
+                body: issueBody, 
+                labels: ['sitemap-monitor','automated','bug'] 
+              });
             }
 
       - name: Close Issue if All Healthy
@@ -309,15 +367,26 @@ _Automatically created by the Enhanced Sitemap Monitor workflow._`;
           script: |
             const issueTitle = '🗺️ Sitemap Monitor: Issues Detected';
             const issues = await github.rest.issues.listForRepo({
-              owner: context.repo.owner, repo: context.repo.repo, state: 'open', labels: ['sitemap-monitor','automated']
+              owner: context.repo.owner, 
+              repo: context.repo.repo, 
+              state: 'open', 
+              labels: ['sitemap-monitor','automated']
             });
+            
             const existing = issues.data.find(i => i.title === issueTitle);
             if (existing) {
               await github.rest.issues.createComment({
-                owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number,
+                owner: context.repo.owner, 
+                repo: context.repo.repo, 
+                issue_number: existing.number,
                 body: `✅ All sitemap issues resolved!\n\nRun: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`
               });
-              await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number, state: 'closed' });
+              await github.rest.issues.update({ 
+                owner: context.repo.owner, 
+                repo: context.repo.repo, 
+                issue_number: existing.number, 
+                state: 'closed' 
+              });
             }
 
       - name: Update Repository Status Badge
