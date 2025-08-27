@@ -4,7 +4,7 @@ on:
     - cron: '0 8 * * 1,4' # Fixed: Run twice weekly (Monday and Thursday at 8:00 UTC)
   workflow_dispatch: # Allow manual triggering
     inputs:
-      send_email:
+      email:
         description: 'Send email notification?'
         required: false
         default: 'true'
@@ -70,7 +70,7 @@ jobs:
           
           # Send email for manual runs if requested
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            if [ "${{ github.event.inputs.send_email }}" == "true" ]; then
+            if [ "${{ github.event.inputs.email }}" == "true" ]; then
               SHOULD_SEND_EMAIL="true"
               echo "📧 Manual run with email requested"
             else
