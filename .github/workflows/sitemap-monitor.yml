@@ -60,7 +60,7 @@ jobs:
           echo "Service account validation:"
           python -c "import json; json.load(open('service-account.json'))" && echo "✅ Service account JSON is valid" || (echo "❌ Invalid service account JSON" && exit 1)
 
-      # No script creation step needed since your script is in scripts/enhanced_sitemap_monitor.py
+      # No script creation step needed since your script is in .gtihub/scripts/enhanced_sitemap_monitor.py
 
       - name: Run Enhanced Sitemap Monitor
         id: sitemap_check
@@ -77,7 +77,7 @@ jobs:
           else
             REPORT_FLAG="--detailed-report"
           fi
-          python ./scripts/enhanced_sitemap_monitor.py \
+          python ./.github/scripts/enhanced_sitemap_monitor.py \
             --site "$SITE_URL" \
             --sitemaps $SITEMAP_URLS \
             --output-json "sitemap-results.json" \
@@ -131,29 +131,9 @@ jobs:
             echo "status_message=Issues detected - check report" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create Scripts Directory
-        run: mkdir -p scripts
-
-      - name: Create Issue Body Script
-        run: |
-          cat > scripts/make-issue.js << 'EOF'
-          const fs = require('fs');
-          let reportContent = 'Report generation failed.';
-          try { reportContent = fs.readFileSync('sitemap-report.md', 'utf8'); } catch (e) {}
-          const issueBody = `${reportContent}
-
-          **Workflow Run:** [#${process.env.GITHUB_RUN_NUMBER}](${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID})
-          **Triggered by:** ${process.env.GITHUB_EVENT_NAME}
-          **Issues Found:** ${process.env.ISSUES_COUNT}
-          **Fixes Applied:** ${process.env.FIXES_COUNT}
-
-          _Automatically created by the Enhanced Sitemap Monitor workflow._`;
-          console.log(issueBody);
-          EOF
-
       - name: Create Issue Body
         if: steps.check_results.outputs.overall_status != 'healthy'
-        run: node scripts/make-issue.js > issue-body.txt
+        run: node .github/scripts/make-issue.js > issue-body.txt
         env:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
