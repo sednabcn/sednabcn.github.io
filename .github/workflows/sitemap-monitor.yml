@@ -284,12 +284,11 @@ jobs:
             const issueTitle = '🗺️ Sitemap Monitor: Issues Detected';
             let reportContent = 'Report generation failed.';
             try { reportContent = fs.readFileSync('sitemap-report.md', 'utf8'); } catch {}
-            const issueBody = `${reportContent}
 
-**Workflow Run:** [#\${{ github.run_number }}](\${{ github.server_url }}/\${{ github.repository }}/actions/runs/\${{ github.run_id }})
-**Triggered by:** \${{ github.event_name }}
-**Issues Found:** \${{ steps.check_results.outputs.issues_count }}
-**Fixes Applied:** \${{ steps.check_results.outputs.fixes_applied }}`;
+            const issueBody = reportContent + '\n\n**Workflow Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})' + 
+'\n**Triggered by:** ${{ github.event_name }}' +
+'\n**Issues Found:** ${{ steps.check_results.outputs.issues_count }}' +
+'\n**Fixes Applied:** ${{ steps.check_results.outputs.fixes_applied }}';
 
 _Automatically created by the Enhanced Sitemap Monitor workflow._`;
 
