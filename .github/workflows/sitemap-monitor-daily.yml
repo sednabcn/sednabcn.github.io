@@ -1,53 +1,43 @@
 name: Daily Sitemap Monitor
-
 on:
   schedule:
-    - cron: "0 6 * * *" # runs daily at 6 AM UTC
+    - cron: "0 6 * * *" # runs daily at 6 AM UTC (fixed the extra *)
   workflow_dispatch:     # manual trigger
-
 jobs:
   sitemap-monitor:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Install dependencies
         run: pip install google-api-python-client google-auth google-auth-httplib2 google-auth-oauthlib
-
       - name: Google Search Console Sitemap Check
         id: gsc
+        env:
+          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
         run: |
           import os, json, sys
           from google.oauth2 import service_account
           from googleapiclient.discovery import build
-
           SITE_URL = "https://sednabcn.github.io/"   # change if needed
           SITEMAP_URL = "https://sednabcn.github.io/sitemap.xml"
           CREDS_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT")
-
           if not CREDS_JSON:
               print("::error::Missing GOOGLE_SERVICE_ACCOUNT secret")
               sys.exit(1)
-
           creds = service_account.Credentials.from_service_account_info(
               json.loads(CREDS_JSON),
               scopes=["https://www.googleapis.com/auth/webmasters"]
           )
-
           service = build("searchconsole", "v1", credentials=creds)
-
           try:
               # Resubmit sitemap
               service.sitemaps().submit(siteUrl=SITE_URL, feedpath=SITEMAP_URL).execute()
               sitemap_info = service.sitemaps().get(siteUrl=SITE_URL, feedpath=SITEMAP_URL).execute()
-
               report = []
               report.append("## 📊 Google Sitemap Status")
               report.append(f"- Last Submitted: {sitemap_info.get('lastSubmitted', 'N/A')}")
@@ -55,23 +45,21 @@ jobs:
               report.append(f"- Status: {'⏳ Pending' if sitemap_info.get('isPending') else '✅ Processed'}")
               report.append(f"- Warnings: {sitemap_info.get('warnings', 0)}")
               report.append(f"- Errors: {sitemap_info.get('errors', 0)}")
-
               print("\n".join(report))
               with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
                   f.write("\n".join(report))
-
-              # Set job status
-              if sitemap_info.get("errors", 0) > 0:
-                  print("::set-output name=status::unhealthy")
-              else:
-                  print("::set-output name=status::healthy")
-
+              # Set job output (updated syntax)
+              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                  if sitemap_info.get("errors", 0) > 0:
+                      f.write("status=unhealthy\n")
+                  else:
+                      f.write("status=healthy\n")
           except Exception as e:
               print(f"::error::Error checking sitemap: {e}")
-              print("::set-output name=status::unhealthy")
+              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                  f.write("status=unhealthy\n")
               sys.exit(1)
         shell: python
-
       - name: Fail if unhealthy
         if: steps.gsc.outputs.status == 'unhealthy'
-        run: exit 1
+        run: exit 1 
