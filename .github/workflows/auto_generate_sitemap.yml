@@ -124,13 +124,13 @@ jobs:
             }
           }
           EOF
-      
-      - name: Create sitemap generator script
+          
+      - name: Generate sitemap if needed
         run: |
-          # The script will be created in the repository root
-          # Copy the sitemap generator script here
-          curl -sSL https://raw.githubusercontent.com/your-username/sitemap-generator/main/generate_sitemap.py > generate_sitemap.py
-          chmod +x generate_sitemap.py
+          python3 ./scripts/update_sitemap_if_needed.py \
+          --base-url "${{ steps.base_url.outputs.base_url }}" \
+          --output sitemap.xml \
+          --config sitemap-config.json
       
       - name: Generate sitemap
         run: |
