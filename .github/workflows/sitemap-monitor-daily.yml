@@ -50,7 +50,7 @@ jobs:
                   f.write("\n".join(report))
               # Set job output (updated syntax)
               with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-                  if sitemap_info.get("errors", 0) > 0:
+                  if int(sitemap_info.get("errors", 0)) > 0:
                       f.write("status=unhealthy\n")
                   else:
                       f.write("status=healthy\n")
