@@ -132,7 +132,7 @@ jobs:
       - name: Create sitemap generator scripts
         run: |
           # Create the main generator script
-          cat > scripts/generate_sitemap.py << 'GENERATOR_EOF'
+          cat > .github/scripts/generate_sitemap.py << 'GENERATOR_EOF'
           #!/usr/bin/env python3
           import os, sys, json, argparse, subprocess, re
           from datetime import datetime
@@ -332,7 +332,7 @@ jobs:
           GENERATOR_EOF
           
           # Create the conditional checker script
-          cat > scripts/update_sitemap_if_needed.py << 'CHECKER_EOF'
+          cat > .gtihub/scripts/update_sitemap_if_needed.py << 'CHECKER_EOF'
           #!/usr/bin/env python3
           import os, sys, json, argparse, subprocess
           from datetime import datetime
@@ -392,5 +392,5 @@ jobs:
               main()
           CHECKER_EOF
           
-          chmod +x scripts/generate_sitemap.py
-          chmod +x scripts/update_sitemap_if_needed.py
+          chmod +x .github/scripts/generate_sitemap.py
+          chmod +x .github/scripts/update_sitemap_if_needed.py
