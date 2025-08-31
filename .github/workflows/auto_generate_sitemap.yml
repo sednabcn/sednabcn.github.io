@@ -332,7 +332,7 @@ jobs:
           GENERATOR_EOF
           
           # Create the conditional checker script
-          cat > .gtihub/scripts/update_sitemap_if_needed.py << 'CHECKER_EOF'
+          cat > .github/scripts/update_sitemap_if_needed.py << 'CHECKER_EOF'
           #!/usr/bin/env python3
           import os, sys, json, argparse, subprocess
           from datetime import datetime
