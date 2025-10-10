@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unsubscribe - Professional Outreach</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            max-width: 500px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #444;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        input[type="email"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 15px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="email"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn-unsubscribe {
+            width: 100%;
+            padding: 14px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .btn-unsubscribe:hover {
+            background: #c82333;
+        }
+        
+        .btn-unsubscribe:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .message {
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            display: none;
+            font-size: 14px;
+        }
+        
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .info {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            font-size: 13px;
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        .checkmark {
+            font-size: 60px;
+            color: #28a745;
+            text-align: center;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="checkmark" id="checkmark">✓</div>
+        
+        <h1>Unsubscribe</h1>
+        <p class="subtitle">We're sorry to see you go</p>
+        
+        <form id="unsubscribeForm">
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input 
+                    type="email" 
+                    id="email" 
+                    name="email" 
+                    placeholder="your.email@example.com"
+                    required
+                    autocomplete="email"
+                >
+            </div>
+            
+            <button type="submit" class="btn-unsubscribe" id="submitBtn">
+                Unsubscribe Me
+            </button>
+        </form>
+        
+        <div class="message" id="message"></div>
+        
+        <div class="info">
+            <p><strong>What happens next?</strong></p>
+            <p>Your email will be added to our suppression list and you won't receive any further communications from us.</p>
+            <p style="margin-top: 10px;">If you have any questions, please contact: <strong>contact@yourdomain.com</strong></p>
+        </div>
+    </div>
+    
+    <script>
+        // Get email from URL parameter if present
+        const urlParams = new URLSearchParams(window.location.search);
+        const emailParam = urlParams.get('email');
+        const campaignParam = urlParams.get('campaign');
+        
+        if (emailParam) {
+            document.getElementById('email').value = decodeURIComponent(emailParam);
+        }
+        
+        document.getElementById('unsubscribeForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const submitBtn = document.getElementById('submitBtn');
+            const messageDiv = document.getElementById('message');
+            const checkmark = document.getElementById('checkmark');
+            
+            // Disable button
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Processing...';
+            
+            // Simulate processing (since this is static HTML)
+            setTimeout(() => {
+                // Show success message
+                messageDiv.className = 'message success';
+                messageDiv.style.display = 'block';
+                messageDiv.innerHTML = `
+                    <strong>Successfully unsubscribed!</strong><br>
+                    ${email} has been removed from our mailing list.
+                `;
+                
+                // Show checkmark
+                checkmark.style.display = 'block';
+                
+                // Hide form
+                document.getElementById('unsubscribeForm').style.display = 'none';
+                
+                // Log to console (for tracking)
+                console.log('Unsubscribe request:', {
+                    email: email,
+                    campaign: campaignParam || 'all',
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Optional: Send to Google Form or other tracking
+                // trackUnsubscribe(email, campaignParam);
+                
+            }, 1500);
+        });
+        
+        // Optional: Function to track unsubscribes via Google Forms
+        function trackUnsubscribe(email, campaign) {
+            // Replace with your Google Form URL
+            const formUrl = 'https://docs.google.com/forms/d/e/YOUR_FORM_ID/formResponse';
+            
+            const formData = new FormData();
+            formData.append('entry.EMAIL_FIELD_ID', email); // Replace with actual field ID
+            formData.append('entry.CAMPAIGN_FIELD_ID', campaign || 'all');
+            
+            fetch(formUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: formData
+            });
+        }
+    </script>
+</body>
+</html>
