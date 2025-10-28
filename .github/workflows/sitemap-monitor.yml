@@ -68,31 +68,58 @@ jobs:
           FORCE_RESUBMIT: ${{ github.event.inputs.force_resubmit || 'false' }}
           DETAILED_REPORT: ${{ github.event.inputs.detailed_report || 'true' }}
         run: |
+          echo "=== Starting Sitemap Monitor ==="
+          echo "Site URL: $SITE_URL"
+          echo "Sitemap URLs: $SITEMAP_URLS"
+          echo ""
+          
+          # Build command arguments
           FORCE_RESUBMIT_FLAG=""
           if [ "${FORCE_RESUBMIT}" = "true" ]; then
             FORCE_RESUBMIT_FLAG="--force-resubmit"
           fi
+          
+          REPORT_FLAG="--detailed-report"
           if [ "${DETAILED_REPORT}" = "false" ]; then
             REPORT_FLAG="--no-detailed-report"
-          else
-            REPORT_FLAG="--detailed-report"
           fi
-          python ./.github/scripts/enhanced_sitemap_monitor.py \
+          
+          # Run the Python script and capture output
+          set +e  # Don't exit on error
+          python .github/scripts/enhanced_sitemap_monitor.py \
             --site "$SITE_URL" \
             --sitemaps $SITEMAP_URLS \
             --output-json "sitemap-results.json" \
             --output-report "sitemap-report.md" \
-            $FORCE_RESUBMIT_FLAG $REPORT_FLAG
-        continue-on-error: true
-
-      - name: Ensure Output Files Exist (Fallback)
-        run: |
-          if [ ! -f "sitemap-results.json" ]; then
-            echo '{"summary":{"overall_status":"no_output","issues_found":1,"fixes_applied":0},"sitemaps":[],"issues_found":["No results file created"],"fixes_applied":[]}' > sitemap-results.json
+            --service-account "service-account.json" \
+            $FORCE_RESUBMIT_FLAG $REPORT_FLAG 2>&1 | tee sitemap-monitor.log
+          
+          SCRIPT_EXIT_CODE=${PIPESTATUS[0]}
+          set -e  # Re-enable exit on error
+          
+          echo ""
+          echo "=== Script completed with exit code: $SCRIPT_EXIT_CODE ==="
+          echo "script_exit_code=$SCRIPT_EXIT_CODE" >> $GITHUB_OUTPUT
+          
+          # Check if files were created
+          if [ -f "sitemap-results.json" ] && [ -f "sitemap-report.md" ]; then
+            echo "✅ Output files created successfully"
+            exit 0
+          else
+            echo "❌ Output files were not created"
+            # Create minimal error files
+            if [ ! -f "sitemap-results.json" ]; then
+              echo '{"summary":{"overall_status":"script_failed","issues_found":1,"fixes_applied":0},"sitemaps":[],"issues_found":["Script execution failed - no output generated"],"fixes_applied":[],"timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > sitemap-results.json
+            fi
+            if [ ! -f "sitemap-report.md" ]; then
+              echo "# Sitemap Monitor - Script Failed" > sitemap-report.md
+              echo "" >> sitemap-report.md
+              echo "The monitoring script failed to execute properly." >> sitemap-report.md
+              echo "Check the workflow logs for details." >> sitemap-report.md
+            fi
+            exit 0  # Don't fail the step, let validation handle it
           fi
-          if [ ! -f "sitemap-report.md" ]; then
-            echo "# Sitemap Monitor Failed\nNo report was generated." > sitemap-report.md
-          fi
+      
 
       - name: Validate Report Generation
         run: |
