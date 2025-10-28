@@ -54,8 +54,7 @@ jobs:
           pip install google-api-python-client google-auth-oauthlib google-auth-httplib2
           pip install requests beautifulsoup4 lxml tabulate colorama
           pip install python-dateutil pytz markdown2 jinja2
-          pip install packaging
-          
+
       - name: Setup service account credentials
         run: |
           echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT }}' > service-account.json
